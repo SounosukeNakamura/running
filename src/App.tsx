@@ -112,26 +112,6 @@ function evaluateCondition(
  */
 async function fetchWeather(latitude: number, longitude: number, timezone: string = 'Asia/Tokyo'): Promise<WeatherInfo> {
   try {
-    // 現在時刻と指定時間帯に対応する時間を計算
-    const now = new Date()
-    const hours = now.getHours()
-
-    // 時間帯に応じて対象時刻を決定
-    let targetHour: number
-    if (hours < 6) {
-      // 朝（6:00）
-      targetHour = 6
-    } else if (hours < 12) {
-      // 昼（12:00）
-      targetHour = 12
-    } else if (hours < 18) {
-      // 夜（18:00）
-      targetHour = 18
-    } else {
-      // 次の日の朝（6:00）
-      targetHour = 6
-    }
-
     // Open-Meteo APIを呼び出す
     const params = new URLSearchParams({
       latitude: latitude.toString(),
