@@ -61,15 +61,21 @@ export default function App() {
 
     // Geolonia が読み込まれるまで待つ
     let checkCount = 0
-    const maxChecks = 60 // 3秒間（50ms * 60）
+    const maxChecks = 100 // 5秒間（50ms * 100）
     
     const checkGeolonia = setInterval(() => {
       checkCount++
+      console.log(`Checking Geolonia... (${checkCount}/${maxChecks})`, window.geolonia ? 'found' : 'not found')
+      
       if (window.geolonia) {
         clearInterval(checkGeolonia)
         try {
+          // Geolonia の再描画をトリガー
+          const elements = document.querySelectorAll('[data-lat][data-lng]')
+          console.log(`Found ${elements.length} map elements`)
+          
           window.geolonia.onReady(() => {
-            console.log('Geolonia is ready', location)
+            console.log('Geolonia.onReady called', location)
             setGeoloniaReady(true)
           })
         } catch (err) {
@@ -78,7 +84,7 @@ export default function App() {
         }
       } else if (checkCount >= maxChecks) {
         clearInterval(checkGeolonia)
-        console.warn('Geolonia load timeout')
+        console.error('Geolonia load timeout after 5 seconds')
         setGeoloniaReady(true) // タイムアウトでも地図表示は試みる
       }
     }, 50)
