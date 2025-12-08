@@ -55,10 +55,15 @@ export default function App() {
    */
   useEffect(() => {
     if (location && window.geolonia) {
-      // Geoloniaの再描画をトリガー
-      window.geolonia.onReady(() => {
-        // 地図が読み込まれたら、必要に応じてカスタム処理
-      })
+      try {
+        // Geoloniaの再描画をトリガー
+        window.geolonia.onReady(() => {
+          console.log('Geolonia is ready', location)
+        })
+      } catch (err) {
+        console.error('Geolonia error:', err)
+        setLocationError('地図の読み込みに失敗しました')
+      }
     }
   }, [location])
 
@@ -97,7 +102,7 @@ export default function App() {
   /**
    * 手動で位置情報を設定
    */
-  const handleSetManualLocation = (e: React.FormEvent) => {
+  const handleSetManualLocation = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setError('')
 
@@ -266,12 +271,18 @@ export default function App() {
               )}
 
               {/* 地図表示 */}
-              <div
-                className="geolonia-map"
-                data-lat={location.lat}
-                data-lng={location.lng}
-                data-zoom="14"
-              />
+              {window.geolonia ? (
+                <div
+                  className="geolonia-map"
+                  data-lat={location.lat}
+                  data-lng={location.lng}
+                  data-zoom="14"
+                />
+              ) : (
+                <div className="geolonia-map" style={{ backgroundColor: '#f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <p>地図読み込み中...</p>
+                </div>
+              )}
             </>
           ) : null}
 
