@@ -59,38 +59,31 @@ export default function App() {
   useEffect(() => {
     if (!location) return
 
-    // Geolonia スクリプト読み込みを待つ
-    const waitForGeolonia = async () => {
-      let attempts = 0
-      const maxAttempts = 100 // 5秒（50ms × 100）
-      
-      while (attempts < maxAttempts && !window.geolonia) {
-        await new Promise(resolve => setTimeout(resolve, 50))
-        attempts++
-        if (attempts % 20 === 0) {
-          console.log(`Waiting for Geolonia... ${attempts}/${maxAttempts}`)
-        }
-      }
-      
+    // Geolonia スクリプト読み込み完了を待つ
+    const initMap = () => {
       if (window.geolonia) {
-        console.log('✓ Geolonia found! Initializing map...')
         try {
-          // Geolonia のコールバック登録
-          window.geolonia.onReady(() => {
-            console.log('✓ Geolonia map ready')
-            setGeoloniaReady(true)
-          })
+          // Geolonia スクリプトが読み込まれた場合、自動的に地図を描画
+          console.log('✓ Geolonia loaded, initializing maps...')
+          setGeoloniaReady(true)
+          
+          // 非同期で地図再初期化
+          if (window.geolonia.onReady) {
+            window.geolonia.onReady(() => {
+              console.log('✓ All maps ready')
+            })
+          }
         } catch (err) {
-          console.error('❌ Geolonia initialization error:', err)
+          console.error('Error initializing Geolonia:', err)
           setGeoloniaReady(true)
         }
       } else {
-        console.error('❌ Geolonia not loaded after 5 seconds')
-        setGeoloniaReady(false)
+        // スクリプトがまだ読み込まれていない場合は、少し後に再試行
+        setTimeout(initMap, 100)
       }
     }
     
-    waitForGeolonia()
+    initMap()
   }, [location])
 
   // ===== 位置情報関連の関数 =====
