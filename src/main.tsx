@@ -3,7 +3,7 @@ import App from './App.tsx'
 
 // Geolonia Maps スクリプトの動的読み込み
 const loadGeolonia = () => {
-  const apiKey = import.meta.env.VITE_GEOLONIA_API_KEY
+  const apiKey = import.meta.env.VITE_GEOLONIA_API_KEY || '57e50c6fcf3240359f4cf08862c029d6'
   if (!apiKey) {
     console.warn('Geolonia API キーが設定されていません')
     return
