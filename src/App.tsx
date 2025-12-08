@@ -59,30 +59,36 @@ export default function App() {
   useEffect(() => {
     if (!location) return
 
-    // Geolonia スクリプトが読み込まれている場合、自動的に地図を初期化
-    setTimeout(() => {
+    // Geolonia スクリプトが読み込まれるまで待つ
+    const checkGeolonia = setInterval(() => {
       if (window.geolonia) {
-        console.log('✓ Geolonia script loaded')
+        clearInterval(checkGeolonia)
+        console.log('✓ Geolonia loaded, initializing maps...')
+        
         try {
-          // Geolonia の onReady コールバックを登録
-          if (window.geolonia.onReady) {
-            window.geolonia.onReady(() => {
-              console.log('✓ Geolonia maps initialized')
+          // Geolonia に地図要素を再スキャンさせる
+          if ((window.geolonia as any).onReady) {
+            (window.geolonia as any).onReady(() => {
+              console.log('✓ Geolonia maps ready')
               setGeoloniaReady(true)
             })
           } else {
-            // onReady が存在しない場合は直接初期化
+            // onReady がない場合は直接スキャン
+            const elements = document.querySelectorAll('[data-lat][data-lng]')
+            console.log(`Found ${elements.length} map elements to initialize`)
+            elements.forEach((element: any) => {
+              console.log(`Initializing map at ${element.getAttribute('data-lat')}, ${element.getAttribute('data-lng')}`)
+            })
             setGeoloniaReady(true)
           }
         } catch (err) {
-          console.error('Geolonia error:', err)
+          console.error('Error initializing Geolonia:', err)
           setGeoloniaReady(true)
         }
-      } else {
-        console.warn('⚠️ Geolonia script not loaded')
-        setGeoloniaReady(true)
       }
-    }, 500)
+    }, 100)
+
+    return () => clearInterval(checkGeolonia)
   }, [location])
 
   // ===== 位置情報関連の関数 =====
