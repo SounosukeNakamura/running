@@ -228,8 +228,6 @@ export default function App() {
 
   // ===== レンダリング =====
 
-  const geoloniaApiKey = import.meta.env.VITE_GEOLONIA_API_KEY
-
   return (
     <div className="app-container">
       {/* ヘッダー */}
@@ -421,32 +419,6 @@ export default function App() {
       </footer>
     </div>
   )
-}
-
-// TypeScript GeoJSON型定義
-namespace GeoJSON {
-  export interface FeatureCollection {
-    type: 'FeatureCollection'
-    features: Feature[]
-  }
-
-  export interface Feature {
-    type: 'Feature'
-    properties: Record<string, unknown>
-    geometry: Geometry
-  }
-
-  export type Geometry = LineString | Point
-
-  export interface LineString {
-    type: 'LineString'
-    coordinates: [number, number][]
-  }
-
-  export interface Point {
-    type: 'Point'
-    coordinates: [number, number]
-  }
 }
 
 // グローバル型の拡張（Geolonia）
