@@ -30,18 +30,18 @@
         
         // すべてのデータ属性を持つ要素を処理
         const mapElements = document.querySelectorAll('[data-lat][data-lng]');
-        console.log(`Found ${mapElements.length} map elements to initialize`);
+        console.log('Found ' + mapElements.length + ' map elements to initialize');
         
-        mapElements.forEach((element, index) => {
+        mapElements.forEach(function(element, index) {
           const lat = parseFloat(element.getAttribute('data-lat'));
           const lng = parseFloat(element.getAttribute('data-lng'));
           const zoom = parseInt(element.getAttribute('data-zoom') || '14');
           
-          console.log(`Initializing map ${index + 1}: lat=${lat}, lng=${lng}, zoom=${zoom}`);
+          console.log('Initializing map ' + (index + 1) + ': lat=' + lat + ', lng=' + lng + ', zoom=' + zoom);
           
           try {
             // Geolonia.Map クラスを使用して明示的に地図を作成
-            const map = new (window.geolonia as any).Map({
+            const map = new window.geolonia.Map({
               container: element,
               style: 'https://cdn.geolonia.com/alls/v1/style.json',
               center: [lng, lat],
@@ -50,15 +50,15 @@
               bearing: 0
             });
             
-            map.on('load', () => {
-              console.log(`✓ Map ${index + 1} loaded successfully`);
+            map.on('load', function() {
+              console.log('✓ Map ' + (index + 1) + ' loaded successfully');
             });
             
-            map.on('error', (error: any) => {
-              console.error(`Map ${index + 1} error:`, error);
+            map.on('error', function(error) {
+              console.error('Map ' + (index + 1) + ' error:', error);
             });
           } catch (err) {
-            console.error(`Failed to initialize map ${index + 1}:`, err);
+            console.error('Failed to initialize map ' + (index + 1) + ':', err);
           }
         });
       };
@@ -68,7 +68,7 @@
         if (window.geolonia) {
           console.log('✓ Geolonia loaded on page load');
           // React がレンダリングするまで少し待つ
-          setTimeout(() => {
+          setTimeout(function() {
             window.initializeGeoloniaMaps();
           }, 500);
         }
