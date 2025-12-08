@@ -59,12 +59,14 @@ export default function App() {
   useEffect(() => {
     if (!location) return
 
-    // Geolonia が読み込まれるまで待つ（最大3秒）
-    let timeoutId: ReturnType<typeof setTimeout>
+    // Geolonia が読み込まれるまで待つ
+    let checkCount = 0
+    const maxChecks = 60 // 3秒間（50ms * 60）
+    
     const checkGeolonia = setInterval(() => {
+      checkCount++
       if (window.geolonia) {
         clearInterval(checkGeolonia)
-        clearTimeout(timeoutId)
         try {
           window.geolonia.onReady(() => {
             console.log('Geolonia is ready', location)
@@ -72,21 +74,17 @@ export default function App() {
           })
         } catch (err) {
           console.error('Geolonia error:', err)
-          setGeoloniaReady(false)
+          setGeoloniaReady(true) // エラーでも地図表示は試みる
         }
+      } else if (checkCount >= maxChecks) {
+        clearInterval(checkGeolonia)
+        console.warn('Geolonia load timeout')
+        setGeoloniaReady(true) // タイムアウトでも地図表示は試みる
       }
     }, 50)
 
-    // 3秒でタイムアウト
-    timeoutId = setTimeout(() => {
-      clearInterval(checkGeolonia)
-      console.warn('Geolonia timeout')
-      setGeoloniaReady(false)
-    }, 3000)
-
     return () => {
       clearInterval(checkGeolonia)
-      clearTimeout(timeoutId)
     }
   }, [location])
 
