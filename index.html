@@ -138,10 +138,15 @@
             markerElement.style.fontWeight = 'bold';
             markerElement.textContent = idx;
             
-            new window.geolonia.Marker({
-              element: markerElement,
-              lngLat: [point.lng, point.lat]
-            }).addTo(map);
+            try {
+              new window.geolonia.Marker({
+                element: markerElement
+              })
+              .setLngLat([point.lng, point.lat])
+              .addTo(map);
+            } catch (err) {
+              console.error('Error creating marker ' + idx + ':', err);
+            }
           });
           
           console.log('✓ Course displayed on map with ' + coursePoints.length + ' markers');
