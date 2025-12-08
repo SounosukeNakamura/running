@@ -18,6 +18,17 @@
     <!-- Geolonia Maps Embed API -->
     <script type="text/javascript" src="https://cdn.geolonia.com/v1/embed?geolonia-api-key=57e50c6fcf3240359f4cf08862c029d6"></script>
     
+    <script>
+      // Geolonia スクリプト読み込み後に地図を自動初期化
+      window.addEventListener('load', function() {
+        if (window.geolonia && window.geolonia.onReady) {
+          window.geolonia.onReady(function() {
+            console.log('Geolonia maps auto-initialized on page load');
+          });
+        }
+      });
+    </script>
+    
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
