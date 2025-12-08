@@ -59,31 +59,30 @@ export default function App() {
   useEffect(() => {
     if (!location) return
 
-    // Geolonia スクリプト読み込み完了を待つ
-    const initMap = () => {
+    // Geolonia スクリプトが読み込まれている場合、自動的に地図を初期化
+    setTimeout(() => {
       if (window.geolonia) {
+        console.log('✓ Geolonia script loaded')
         try {
-          // Geolonia スクリプトが読み込まれた場合、自動的に地図を描画
-          console.log('✓ Geolonia loaded, initializing maps...')
-          setGeoloniaReady(true)
-          
-          // 非同期で地図再初期化
+          // Geolonia の onReady コールバックを登録
           if (window.geolonia.onReady) {
             window.geolonia.onReady(() => {
-              console.log('✓ All maps ready')
+              console.log('✓ Geolonia maps initialized')
+              setGeoloniaReady(true)
             })
+          } else {
+            // onReady が存在しない場合は直接初期化
+            setGeoloniaReady(true)
           }
         } catch (err) {
-          console.error('Error initializing Geolonia:', err)
+          console.error('Geolonia error:', err)
           setGeoloniaReady(true)
         }
       } else {
-        // スクリプトがまだ読み込まれていない場合は、少し後に再試行
-        setTimeout(initMap, 100)
+        console.warn('⚠️ Geolonia script not loaded')
+        setGeoloniaReady(true)
       }
-    }
-    
-    initMap()
+    }, 500)
   }, [location])
 
   // ===== 位置情報関連の関数 =====
