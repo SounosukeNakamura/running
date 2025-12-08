@@ -66,19 +66,35 @@ export default function App() {
         console.log('✓ Geolonia loaded, initializing maps...')
         
         try {
-          // Geolonia に地図要素を再スキャンさせる
-          if ((window.geolonia as any).onReady) {
-            (window.geolonia as any).onReady(() => {
-              console.log('✓ Geolonia maps ready')
+          // 地図要素を再スキャンして Geolonia を強制初期化
+          const mapElement = document.querySelector('[data-lat][data-lng]')
+          if (mapElement) {
+            console.log(`Map element found: lat=${mapElement.getAttribute('data-lat')}, lng=${mapElement.getAttribute('data-lng')}`)
+            
+            const geoloniaObj = window.geolonia as any
+            
+            // Geolonia のメソッドを順に試す
+            if (typeof geoloniaObj.onReady === 'function') {
+              console.log('Calling Geolonia.onReady()...')
+              geoloniaObj.onReady(() => {
+                console.log('✓ Geolonia onReady callback executed')
+                setGeoloniaReady(true)
+              })
+            } else if (typeof geoloniaObj.scribe === 'function') {
+              console.log('Calling Geolonia.scribe()...')
+              geoloniaObj.scribe()
               setGeoloniaReady(true)
-            })
+            } else if (typeof geoloniaObj.register === 'function') {
+              console.log('Calling Geolonia.register()...')
+              geoloniaObj.register()
+              setGeoloniaReady(true)
+            } else {
+              console.log('Geolonia methods not available, setting ready anyway')
+              console.log('Available methods:', Object.keys(geoloniaObj))
+              setGeoloniaReady(true)
+            }
           } else {
-            // onReady がない場合は直接スキャン
-            const elements = document.querySelectorAll('[data-lat][data-lng]')
-            console.log(`Found ${elements.length} map elements to initialize`)
-            elements.forEach((element: any) => {
-              console.log(`Initializing map at ${element.getAttribute('data-lat')}, ${element.getAttribute('data-lng')}`)
-            })
+            console.warn('No map element found with [data-lat][data-lng]')
             setGeoloniaReady(true)
           }
         } catch (err) {
