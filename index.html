@@ -19,12 +19,58 @@
     <script type="text/javascript" src="https://cdn.geolonia.com/v1/embed?geolonia-api-key=57e50c6fcf3240359f4cf08862c029d6"></script>
     
     <script>
-      // Geolonia スクリプト読み込み後に地図を自動初期化
+      // Geolonia スクリプト読み込み後にグローバルな地図初期化関数を登録
+      window.initializeGeoloniaMaps = function() {
+        console.log('🗺️ initializeGeoloniaMaps() called');
+        
+        if (!window.geolonia) {
+          console.error('❌ Geolonia not loaded');
+          return;
+        }
+        
+        // すべてのデータ属性を持つ要素を処理
+        const mapElements = document.querySelectorAll('[data-lat][data-lng]');
+        console.log(`Found ${mapElements.length} map elements to initialize`);
+        
+        mapElements.forEach((element, index) => {
+          const lat = parseFloat(element.getAttribute('data-lat'));
+          const lng = parseFloat(element.getAttribute('data-lng'));
+          const zoom = parseInt(element.getAttribute('data-zoom') || '14');
+          
+          console.log(`Initializing map ${index + 1}: lat=${lat}, lng=${lng}, zoom=${zoom}`);
+          
+          try {
+            // Geolonia.Map クラスを使用して明示的に地図を作成
+            const map = new (window.geolonia as any).Map({
+              container: element,
+              style: 'https://cdn.geolonia.com/alls/v1/style.json',
+              center: [lng, lat],
+              zoom: zoom,
+              pitch: 0,
+              bearing: 0
+            });
+            
+            map.on('load', () => {
+              console.log(`✓ Map ${index + 1} loaded successfully`);
+            });
+            
+            map.on('error', (error: any) => {
+              console.error(`Map ${index + 1} error:`, error);
+            });
+          } catch (err) {
+            console.error(`Failed to initialize map ${index + 1}:`, err);
+          }
+        });
+      };
+      
+      // Geolonia 読み込み完了後に初期化
       window.addEventListener('load', function() {
-        if (window.geolonia && window.geolonia.onReady) {
-          window.geolonia.onReady(function() {
-            console.log('Geolonia maps auto-initialized on page load');
-          });
+        if (window.geolonia) {
+          console.log('✓ Geolonia loaded on page load');
+          // React がレンダリングするまで少し待つ
+          setTimeout(() => {
+            window.initializeGeoloniaMaps();
+          }, 500);
         }
       });
     </script>

@@ -59,52 +59,24 @@ export default function App() {
   useEffect(() => {
     if (!location) return
 
-    // Geolonia スクリプトが読み込まれるまで待つ
-    const checkGeolonia = setInterval(() => {
-      if (window.geolonia) {
-        clearInterval(checkGeolonia)
-        console.log('✓ Geolonia loaded, initializing maps...')
-        
+    // React がレンダリング完了してから Geolonia 地図を初期化
+    const timer = setTimeout(() => {
+      if (window.geolonia && (window as any).initializeGeoloniaMaps) {
+        console.log('✓ Calling initializeGeoloniaMaps from React...')
         try {
-          // 地図要素を再スキャンして Geolonia を強制初期化
-          const mapElement = document.querySelector('[data-lat][data-lng]')
-          if (mapElement) {
-            console.log(`Map element found: lat=${mapElement.getAttribute('data-lat')}, lng=${mapElement.getAttribute('data-lng')}`)
-            
-            const geoloniaObj = window.geolonia as any
-            
-            // Geolonia のメソッドを順に試す
-            if (typeof geoloniaObj.onReady === 'function') {
-              console.log('Calling Geolonia.onReady()...')
-              geoloniaObj.onReady(() => {
-                console.log('✓ Geolonia onReady callback executed')
-                setGeoloniaReady(true)
-              })
-            } else if (typeof geoloniaObj.scribe === 'function') {
-              console.log('Calling Geolonia.scribe()...')
-              geoloniaObj.scribe()
-              setGeoloniaReady(true)
-            } else if (typeof geoloniaObj.register === 'function') {
-              console.log('Calling Geolonia.register()...')
-              geoloniaObj.register()
-              setGeoloniaReady(true)
-            } else {
-              console.log('Geolonia methods not available, setting ready anyway')
-              console.log('Available methods:', Object.keys(geoloniaObj))
-              setGeoloniaReady(true)
-            }
-          } else {
-            console.warn('No map element found with [data-lat][data-lng]')
-            setGeoloniaReady(true)
-          }
+          (window as any).initializeGeoloniaMaps()
+          setGeoloniaReady(true)
         } catch (err) {
-          console.error('Error initializing Geolonia:', err)
+          console.error('Error initializing Geolonia maps:', err)
           setGeoloniaReady(true)
         }
+      } else {
+        console.warn('Geolonia or initializeGeoloniaMaps not available')
+        setGeoloniaReady(true)
       }
     }, 100)
 
-    return () => clearInterval(checkGeolonia)
+    return () => clearTimeout(timer)
   }, [location])
 
   // ===== 位置情報関連の関数 =====
