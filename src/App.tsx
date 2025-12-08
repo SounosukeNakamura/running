@@ -59,39 +59,38 @@ export default function App() {
   useEffect(() => {
     if (!location) return
 
-    // Geolonia が読み込まれるまで待つ
-    let checkCount = 0
-    const maxChecks = 100 // 5秒間（50ms * 100）
-    
-    const checkGeolonia = setInterval(() => {
-      checkCount++
-      console.log(`Checking Geolonia... (${checkCount}/${maxChecks})`, window.geolonia ? 'found' : 'not found')
+    // Geolonia スクリプト読み込みを待つ
+    const waitForGeolonia = async () => {
+      let attempts = 0
+      const maxAttempts = 100 // 5秒（50ms × 100）
+      
+      while (attempts < maxAttempts && !window.geolonia) {
+        await new Promise(resolve => setTimeout(resolve, 50))
+        attempts++
+        if (attempts % 20 === 0) {
+          console.log(`Waiting for Geolonia... ${attempts}/${maxAttempts}`)
+        }
+      }
       
       if (window.geolonia) {
-        clearInterval(checkGeolonia)
+        console.log('✓ Geolonia found! Initializing map...')
         try {
-          // Geolonia の再描画をトリガー
-          const elements = document.querySelectorAll('[data-lat][data-lng]')
-          console.log(`Found ${elements.length} map elements`)
-          
+          // Geolonia のコールバック登録
           window.geolonia.onReady(() => {
-            console.log('Geolonia.onReady called', location)
+            console.log('✓ Geolonia map ready')
             setGeoloniaReady(true)
           })
         } catch (err) {
-          console.error('Geolonia error:', err)
-          setGeoloniaReady(true) // エラーでも地図表示は試みる
+          console.error('❌ Geolonia initialization error:', err)
+          setGeoloniaReady(true)
         }
-      } else if (checkCount >= maxChecks) {
-        clearInterval(checkGeolonia)
-        console.error('Geolonia load timeout after 5 seconds')
-        setGeoloniaReady(true) // タイムアウトでも地図表示は試みる
+      } else {
+        console.error('❌ Geolonia not loaded after 5 seconds')
+        setGeoloniaReady(false)
       }
-    }, 50)
-
-    return () => {
-      clearInterval(checkGeolonia)
     }
+    
+    waitForGeolonia()
   }, [location])
 
   // ===== 位置情報関連の関数 =====
