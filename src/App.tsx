@@ -37,6 +37,9 @@ export default function App() {
   const [course, setCourse] = useState<CoursePoint[]>([])
   const [courseDistance, setCourseDistance] = useState(0)
 
+  // Geolonia 状態
+  const [geoloniaReady, setGeoloniaReady] = useState(false)
+
   // UI状態
   const [error, setError] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
@@ -56,21 +59,35 @@ export default function App() {
   useEffect(() => {
     if (!location) return
 
-    // Geolonia が読み込まれるまで待つ
+    // Geolonia が読み込まれるまで待つ（最大5秒）
+    let timeoutId: ReturnType<typeof setTimeout>
     const checkGeolonia = setInterval(() => {
       if (window.geolonia) {
         clearInterval(checkGeolonia)
+        clearTimeout(timeoutId)
         try {
           window.geolonia.onReady(() => {
             console.log('Geolonia is ready', location)
+            setGeoloniaReady(true)
           })
         } catch (err) {
           console.error('Geolonia error:', err)
+          setGeoloniaReady(false)
         }
       }
     }, 100)
 
-    return () => clearInterval(checkGeolonia)
+    // 5秒でタイムアウト
+    timeoutId = setTimeout(() => {
+      clearInterval(checkGeolonia)
+      console.warn('Geolonia timeout - using fallback')
+      setGeoloniaReady(false)
+    }, 5000)
+
+    return () => {
+      clearInterval(checkGeolonia)
+      clearTimeout(timeoutId)
+    }
   }, [location])
 
   // ===== 位置情報関連の関数 =====
@@ -277,7 +294,7 @@ export default function App() {
               )}
 
               {/* 地図表示 */}
-              {window.geolonia ? (
+              {geoloniaReady && window.geolonia ? (
                 <div
                   className="geolonia-map"
                   data-lat={location.lat}
@@ -285,8 +302,8 @@ export default function App() {
                   data-zoom="14"
                 />
               ) : (
-                <div className="geolonia-map" style={{ backgroundColor: '#f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <p>地図読み込み中...</p>
+                <div className="geolonia-map" style={{ backgroundColor: '#f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666' }}>
+                  <p>📍 緯度: {location.lat.toFixed(4)}, 経度: {location.lng.toFixed(4)}</p>
                 </div>
               )}
             </>
