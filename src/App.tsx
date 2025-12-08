@@ -54,17 +54,23 @@ export default function App() {
    * 地図表示の初期化（Geolonia）
    */
   useEffect(() => {
-    if (location && window.geolonia) {
-      try {
-        // Geoloniaの再描画をトリガー
-        window.geolonia.onReady(() => {
-          console.log('Geolonia is ready', location)
-        })
-      } catch (err) {
-        console.error('Geolonia error:', err)
-        setLocationError('地図の読み込みに失敗しました')
+    if (!location) return
+
+    // Geolonia が読み込まれるまで待つ
+    const checkGeolonia = setInterval(() => {
+      if (window.geolonia) {
+        clearInterval(checkGeolonia)
+        try {
+          window.geolonia.onReady(() => {
+            console.log('Geolonia is ready', location)
+          })
+        } catch (err) {
+          console.error('Geolonia error:', err)
+        }
       }
-    }
+    }, 100)
+
+    return () => clearInterval(checkGeolonia)
   }, [location])
 
   // ===== 位置情報関連の関数 =====
@@ -102,7 +108,7 @@ export default function App() {
   /**
    * 手動で位置情報を設定
    */
-  const handleSetManualLocation = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSetManualLocation = (e: any) => {
     e.preventDefault()
     setError('')
 
@@ -127,7 +133,7 @@ export default function App() {
   /**
    * コース生成ボタンのハンドラー
    */
-  const handleGenerateCourse = async (e: React.FormEvent) => {
+  const handleGenerateCourse = async (e: any) => {
     e.preventDefault()
     setError('')
     setWeatherError('')
