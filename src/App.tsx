@@ -1,486 +1,459 @@
 import { useState, useEffect } from 'react'
 import './App.css'
+import {
+  Location,
+  WeatherData,
+  CoursePoint,
+  calculateRunningDistance,
+  generateCircularCourse,
+  fetchWeatherData,
+  validateRunningMinutes,
+  validateLocation,
+} from './utils'
 
 /**
- * 型定義
- */
-
-// Open-Meteo API からのレスポンス型
-interface WeatherResponse {
-  latitude: number
-  longitude: number
-  current: {
-    temperature: number
-    precipitation: number
-    wind_speed: number
-    time: string
-  }
-  hourly?: {
-    time: string[]
-    temperature_2m: number[]
-    precipitation: number[]
-    wind_speed_10m: number[]
-  }
-  timezone: string
-}
-
-// アプリケーションの状態管理用型
-interface RunningCondition {
-  distance: number | ''
-  type: 'running' | 'walking'
-  timeOfDay: 'now' | 'morning' | 'afternoon' | 'evening'
-}
-
-interface WeatherInfo {
-  temperature: number
-  precipitation: number
-  windSpeed: number
-  runability: string
-  advice: string
-}
-
-// 走りやすさ判定結果の型
-interface EvaluationResult {
-  level: string
-  advice: string
-}
-
-/**
- * 走りやすさを判定するロジック関数
- * 気温、降水量、風速から走りやすさレベルを計算する
- */
-function evaluateCondition(
-  temperature: number,
-  precipitation: number,
-  windSpeed: number
-): EvaluationResult {
-  // 基本的な判定ロジック
-  const isComfortableTemp = temperature >= 10 && temperature <= 22
-  const isNoPrecipitation = precipitation === 0
-  const isLowWind = windSpeed < 5
-
-  if (isComfortableTemp && isNoPrecipitation && isLowWind) {
-    return {
-      level: 'とても走りやすい',
-      advice: '最高の条件です。通常ペースで楽しんでください！',
-    }
-  }
-
-  if (temperature > 25) {
-    return {
-      level: 'まあまあ',
-      advice: '気温が高めなので、ペースは少し落としてこまめに水分補給をしてください。',
-    }
-  }
-
-  if (temperature < 5) {
-    return {
-      level: 'まあまあ',
-      advice: '気温が低いので、ウォーミングアップをしっかり行い、防寒対策をしてください。',
-    }
-  }
-
-  if (precipitation > 0) {
-    return {
-      level: '控えめ推奨',
-      advice: '降水があります。雨具を準備し、滑りやすい路面に注意してください。',
-    }
-  }
-
-  if (windSpeed >= 5 && windSpeed < 10) {
-    return {
-      level: '控えめ推奨',
-      advice: '風が強めです。露出した場所では注意が必要です。',
-    }
-  }
-
-  if (windSpeed >= 10) {
-    return {
-      level: '今日は見送り推奨',
-      advice: '非常に強い風が予想されます。今日は見送り、別の日に変更をおすすめします。',
-    }
-  }
-
-  return {
-    level: 'まあまあ',
-    advice: '平均的な条件です。無理のないペースで楽しんでください。',
-  }
-}
-
-/**
- * Open-Meteo APIから天気情報を取得する関数
- */
-async function fetchWeather(latitude: number, longitude: number, timezone: string = 'Asia/Tokyo'): Promise<WeatherInfo> {
-  try {
-    // Open-Meteo APIを呼び出す
-    const params = new URLSearchParams({
-      latitude: latitude.toString(),
-      longitude: longitude.toString(),
-      current: 'temperature_2m,precipitation,wind_speed_10m',
-      hourly: 'temperature_2m,precipitation,wind_speed_10m',
-      timezone: timezone,
-      forecast_days: '1',
-    })
-
-    const response = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`)
-    if (!response.ok) {
-      throw new Error(`API error: ${response.status}`)
-    }
-
-    const data: WeatherResponse = await response.json()
-
-    // 現在の天気情報を使用
-    const temperature = data.current.temperature
-    const precipitation = data.current.precipitation
-    const windSpeed = data.current.wind_speed
-
-    const { level, advice } = evaluateCondition(temperature, precipitation, windSpeed)
-
-    return {
-      temperature,
-      precipitation,
-      windSpeed,
-      runability: level,
-      advice,
-    }
-  } catch (error) {
-    console.error('天気APIエラー:', error)
-    throw error
-  }
-}
-
-/**
- * コース提案テキストを生成する関数
- */
-function generateCourseProposal(
-  distance: number,
-  type: 'running' | 'walking',
-  weather: WeatherInfo
-): string {
-  const typeLabel = type === 'running' ? 'ランニング' : 'ウォーキング'
-  const halfDistance = distance / 2
-
-  let proposal = `約 ${distance}km の${typeLabel}コースを想定して、自宅から${halfDistance}km地点で折り返す往復コースをおすすめします。\n\n`
-  proposal += `走りやすさ: ${weather.runability}\n`
-  proposal += `アドバイス: ${weather.advice}`
-
-  return proposal
-}
-
-/**
- * メインコンポーネント
+ * メインアプリケーションコンポーネント
+ * ランニングコース提案アプリ
  */
 export default function App() {
-  // 位置情報の状態管理
-  const [latitude, setLatitude] = useState<number | null>(null)
-  const [longitude, setLongitude] = useState<number | null>(null)
-  const [locationError, setLocationError] = useState<string>('')
+  // ===== 状態管理 =====
+
+  // 位置情報
+  const [location, setLocation] = useState<Location | null>(null)
   const [locationLoading, setLocationLoading] = useState(true)
+  const [locationError, setLocationError] = useState('')
 
-  // ランニング条件の状態管理
-  const [condition, setCondition] = useState<RunningCondition>({
-    distance: '',
-    type: 'running',
-    timeOfDay: 'now',
-  })
+  // フォーム入力
+  const [runningMinutes, setRunningMinutes] = useState('')
+  const [manualLat, setManualLat] = useState('')
+  const [manualLng, setManualLng] = useState('')
 
-  // 天気情報と提案の状態管理
-  const [weather, setWeather] = useState<WeatherInfo | null>(null)
-  const [proposal, setProposal] = useState<string>('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string>('')
+  // 天気情報
+  const [weather, setWeather] = useState<WeatherData | null>(null)
+  const [weatherLoading, setWeatherLoading] = useState(false)
+  const [weatherError, setWeatherError] = useState('')
 
-  // コンポーネントマウント時に位置情報を取得
+  // コース情報
+  const [course, setCourse] = useState<CoursePoint[]>([])
+  const [courseDistance, setCourseDistance] = useState(0)
+
+  // UI状態
+  const [error, setError] = useState('')
+  const [isGenerating, setIsGenerating] = useState(false)
+
+  // ===== エフェクト =====
+
+  /**
+   * 初期化：位置情報取得
+   */
   useEffect(() => {
-    const getLocation = () => {
-      if ('geolocation' in navigator) {
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            setLatitude(position.coords.latitude)
-            setLongitude(position.coords.longitude)
-            setLocationLoading(false)
-          },
-          (error) => {
-            console.error('位置情報取得エラー:', error)
-            setLocationError(
-              'ブラウザの位置情報を許可するか、以下のフォームで緯度・経度を手入力してください。'
-            )
-            setLocationLoading(false)
-          }
-        )
-      } else {
-        setLocationError('このブラウザはGeolocation APIに対応していません。')
-        setLocationLoading(false)
-      }
-    }
-
-    getLocation()
+    initializeLocation()
   }, [])
 
   /**
-   * コース提案ボタンのハンドラー
+   * 地図表示の初期化（Geolonia）
    */
-  const handleProposeCourse = async () => {
-    // 入力値の検証
-    if (condition.distance === '' || condition.distance <= 0) {
-      setError('距離を入力してください。')
+  useEffect(() => {
+    if (location && window.geolonia) {
+      // Geoloniaの再描画をトリガー
+      window.geolonia.onReady(() => {
+        // 地図が読み込まれたら、必要に応じてカスタム処理
+      })
+    }
+  }, [location])
+
+  // ===== 位置情報関連の関数 =====
+
+  /**
+   * 初期位置情報の取得またはデフォルト設定
+   */
+  const initializeLocation = () => {
+    if (!navigator.geolocation) {
+      setLocationError('お使いのブラウザはGeolocation APIに対応していません。')
+      setLocationLoading(false)
       return
     }
 
-    if (latitude === null || longitude === null) {
-      setError('位置情報が必要です。緯度・経度を入力してください。')
-      return
-    }
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setLocation({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        })
+        setLocationLoading(false)
+      },
+      () => {
+        // 位置情報取得失敗時は東京をデフォルト設定
+        setLocation({
+          lat: 35.6762,
+          lng: 139.7674,
+        })
+        setLocationError('位置情報の取得に失敗しました。東京をデフォルト位置に設定しています。')
+        setLocationLoading(false)
+      }
+    )
+  }
 
-    setLoading(true)
+  /**
+   * 手動で位置情報を設定
+   */
+  const handleSetManualLocation = (e: React.FormEvent) => {
+    e.preventDefault()
     setError('')
 
-    try {
-      // 天気情報を取得
-      const weatherInfo = await fetchWeather(latitude, longitude)
-      setWeather(weatherInfo)
+    const validation = validateLocation(manualLat, manualLng)
+    if (!validation.valid) {
+      setError(validation.error || '位置情報が無効です')
+      return
+    }
 
-      // コース提案を生成
-      const courseProposal = generateCourseProposal(
-        condition.distance as number,
-        condition.type,
-        weatherInfo
-      )
-      setProposal(courseProposal)
+    setLocation({
+      lat: parseFloat(manualLat),
+      lng: parseFloat(manualLng),
+    })
+
+    setManualLat('')
+    setManualLng('')
+    setLocationError('')
+  }
+
+  // ===== コース生成関連の関数 =====
+
+  /**
+   * コース生成ボタンのハンドラー
+   */
+  const handleGenerateCourse = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+    setWeatherError('')
+    setCourse([])
+
+    // バリデーション
+    const validation = validateRunningMinutes(runningMinutes)
+    if (!validation.valid) {
+      setError(validation.error || '入力値が無効です')
+      return
+    }
+
+    if (!location) {
+      setError('位置情報が必要です。')
+      return
+    }
+
+    try {
+      setIsGenerating(true)
+
+      // 走行距離を計算
+      const minutes = parseFloat(runningMinutes)
+      const distance = calculateRunningDistance(minutes)
+      setCourseDistance(distance)
+
+      // コースを生成
+      const generatedCourse = generateCircularCourse(location, distance, 12)
+      setCourse(generatedCourse)
+
+      // 天気情報を取得
+      fetchWeatherForLocation(location)
     } catch (err) {
-      setError('天気情報の取得に失敗しました。もう一度お試しください。')
+      setError('コース生成中にエラーが発生しました。')
       console.error(err)
     } finally {
-      setLoading(false)
+      setIsGenerating(false)
     }
   }
 
   /**
-   * 緯度・経度の手入力ハンドラー
+   * 位置情報に基づいて天気情報を取得
    */
-  const handleManualLocationInput = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    const formData = new FormData(e.currentTarget)
-    const lat = parseFloat(formData.get('latitude') as string)
-    const lng = parseFloat(formData.get('longitude') as string)
+  const fetchWeatherForLocation = async (loc: Location) => {
+    const apiKey = import.meta.env.VITE_OPENWEATHER_API_KEY
 
-    if (isNaN(lat) || isNaN(lng)) {
-      setLocationError('有効な緯度・経度を入力してください。')
+    if (!apiKey) {
+      setWeatherError('OpenWeather API キーが設定されていません。')
       return
     }
 
-    setLatitude(lat)
-    setLongitude(lng)
-    setLocationError('')
+    try {
+      setWeatherLoading(true)
+      const data = await fetchWeatherData(loc, apiKey)
+      setWeather(data)
+      setWeatherError('')
+    } catch (err) {
+      setWeatherError('天気情報の取得に失敗しました。')
+      console.error('Weather API Error:', err)
+    } finally {
+      setWeatherLoading(false)
+    }
   }
+
+  // ===== ヘルパー関数 =====
+
+  /**
+   * 天気の説明文を生成
+   */
+  const getWeatherDescription = () => {
+    if (!weather) return ''
+
+    const temp = Math.round(weather.main.temp)
+    const feelsLike = Math.round(weather.main.feels_like)
+    const windSpeed = Math.round(weather.wind.speed * 10) / 10
+    const description = weather.weather[0]?.description || ''
+
+    return `${description} (気温: ${temp}°C, 体感: ${feelsLike}°C, 風速: ${windSpeed}m/s)`
+  }
+
+  /**
+   * 天気に基づくアドバイスを生成
+   */
+  const getWeatherAdvice = () => {
+    if (!weather) return ''
+
+    const temp = weather.main.temp
+    const windSpeed = weather.wind.speed
+
+    if (temp > 28) {
+      return '気温が高いです。水分補給をこまめに行い、帽子を被るなど日射対策をしましょう。'
+    }
+
+    if (temp < 5) {
+      return '気温が低いです。ウォーミングアップをしっかり行い、防寒対策をしてください。'
+    }
+
+    if (windSpeed > 6) {
+      return '風が強いです。バランスに注意して走ってください。'
+    }
+
+    return 'ランニングに適した条件です。安全に楽しんでください。'
+  }
+
+  // ===== レンダリング =====
+
+  const geoloniaApiKey = import.meta.env.VITE_GEOLONIA_API_KEY
 
   return (
     <div className="app-container">
       {/* ヘッダー */}
       <header className="app-header">
-        <h1>天気×ランニングコース提案アプリ</h1>
+        <h1>🏃 ランニングコース提案アプリ</h1>
+        <p>天気情報と位置情報からあなたにぴったりなコースを提案します</p>
       </header>
 
       <main className="app-main">
+        {/* エラーメッセージ */}
+        {error && (
+          <div className="alert alert-error">
+            <span>⚠️ {error}</span>
+          </div>
+        )}
+
         {/* 位置情報セクション */}
-        <section className="location-section">
-          <h2>現在地情報</h2>
+        <section className="card">
+          <h2>📍 位置情報</h2>
+
           {locationLoading ? (
-            <p>位置情報取得中…</p>
-          ) : latitude !== null && longitude !== null ? (
-            <div className="location-info">
-              <p>
-                現在地: <strong>緯度 {latitude.toFixed(6)}</strong>、{' '}
-                <strong>経度 {longitude.toFixed(6)}</strong>
-              </p>
-            </div>
-          ) : (
-            <div className="location-error">
-              <p>{locationError}</p>
-              <form onSubmit={handleManualLocationInput} className="manual-location-form">
-                <div className="form-group">
-                  <label htmlFor="latitude">緯度:</label>
-                  <input
-                    type="number"
-                    id="latitude"
-                    name="latitude"
-                    placeholder="例: 35.6762"
-                    step="0.0001"
-                    required
-                  />
+            <div className="loading">位置情報を取得中...</div>
+          ) : location ? (
+            <>
+              <div className="location-display">
+                <p>
+                  <strong>現在地：</strong>
+                  緯度 {location.lat.toFixed(4)}, 経度 {location.lng.toFixed(4)}
+                </p>
+              </div>
+
+              {locationError && (
+                <div className="alert alert-info">
+                  <span>ℹ️ {locationError}</span>
                 </div>
-                <div className="form-group">
-                  <label htmlFor="longitude">経度:</label>
-                  <input
-                    type="number"
-                    id="longitude"
-                    name="longitude"
-                    placeholder="例: 139.7674"
-                    step="0.0001"
-                    required
-                  />
-                </div>
-                <button type="submit" className="btn-secondary">
-                  位置情報を設定
-                </button>
-              </form>
-            </div>
-          )}
+              )}
+
+              {/* 地図表示 */}
+              <div
+                className="geolonia-map"
+                data-lat={location.lat}
+                data-lng={location.lng}
+                data-zoom="14"
+              />
+            </>
+          ) : null}
+
+          {/* 手動位置情報入力 */}
+          <div className="manual-location">
+            <h3>位置情報を手動で設定</h3>
+            <form onSubmit={handleSetManualLocation} className="form-inline">
+              <div className="form-group">
+                <label htmlFor="manual-lat">緯度:</label>
+                <input
+                  id="manual-lat"
+                  type="number"
+                  step="0.0001"
+                  placeholder="35.6762"
+                  value={manualLat}
+                  onChange={(e) => setManualLat(e.target.value)}
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="manual-lng">経度:</label>
+                <input
+                  id="manual-lng"
+                  type="number"
+                  step="0.0001"
+                  placeholder="139.7674"
+                  value={manualLng}
+                  onChange={(e) => setManualLng(e.target.value)}
+                />
+              </div>
+              <button type="submit" className="btn btn-secondary">
+                設定
+              </button>
+            </form>
+          </div>
         </section>
 
-        {/* 入力フォームセクション */}
-        <section className="input-section">
-          <h2>ランニング条件を入力</h2>
-          <form className="condition-form">
+        {/* コース生成セクション */}
+        <section className="card">
+          <h2>⏱️ ランニングコース生成</h2>
+
+          <form onSubmit={handleGenerateCourse} className="form-main">
             <div className="form-group">
-              <label htmlFor="distance">距離 (km):</label>
+              <label htmlFor="running-minutes">走りたい時間（分）:</label>
               <input
+                id="running-minutes"
                 type="number"
-                id="distance"
-                placeholder="例: 5"
-                min="0.1"
-                step="0.1"
-                value={condition.distance}
-                onChange={(e) =>
-                  setCondition({
-                    ...condition,
-                    distance: e.target.value ? parseFloat(e.target.value) : '',
-                  })
-                }
+                min="1"
+                max="300"
+                placeholder="30"
+                value={runningMinutes}
+                onChange={(e) => setRunningMinutes(e.target.value)}
               />
+              <small>1～300分の範囲で入力してください</small>
             </div>
 
-            <div className="form-group">
-              <label htmlFor="type">種別:</label>
-              <select
-                id="type"
-                value={condition.type}
-                onChange={(e) =>
-                  setCondition({
-                    ...condition,
-                    type: e.target.value as 'running' | 'walking',
-                  })
-                }
-              >
-                <option value="running">ランニング</option>
-                <option value="walking">ウォーキング</option>
-              </select>
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="timeOfDay">走りたい時間帯:</label>
-              <select
-                id="timeOfDay"
-                value={condition.timeOfDay}
-                onChange={(e) =>
-                  setCondition({
-                    ...condition,
-                    timeOfDay: e.target.value as 'now' | 'morning' | 'afternoon' | 'evening',
-                  })
-                }
-              >
-                <option value="now">今すぐ</option>
-                <option value="morning">朝</option>
-                <option value="afternoon">昼</option>
-                <option value="evening">夜</option>
-              </select>
-            </div>
-
-            <button
-              type="button"
-              className="btn-primary"
-              onClick={handleProposeCourse}
-              disabled={loading}
-            >
-              {loading ? '取得中...' : 'コースを提案'}
+            <button type="submit" disabled={isGenerating || !location} className="btn btn-primary">
+              {isGenerating ? 'コース生成中...' : 'コースを生成'}
             </button>
           </form>
         </section>
 
-        {/* エラーメッセージ */}
-        {error && <div className="error-message">{error}</div>}
+        {/* コース情報セクション */}
+        {course.length > 0 && (
+          <section className="card">
+            <h2>🗺️ 提案コース</h2>
+
+            <div className="course-info">
+              <div className="info-item">
+                <span className="label">走行距離:</span>
+                <span className="value">{courseDistance.toFixed(2)} km</span>
+              </div>
+              <div className="info-item">
+                <span className="label">ポイント数:</span>
+                <span className="value">{course.length} 地点</span>
+              </div>
+            </div>
+
+            {/* コースの詳細情報 */}
+            <details>
+              <summary>コースの詳細座標</summary>
+              <div className="course-details">
+                {course.map((point, idx) => (
+                  <div key={idx} className="point-info">
+                    <strong>ポイント {idx}:</strong> {point.lat.toFixed(6)}, {point.lng.toFixed(6)}
+                  </div>
+                ))}
+              </div>
+            </details>
+          </section>
+        )}
 
         {/* 天気情報セクション */}
+        {weatherLoading && (
+          <section className="card">
+            <div className="loading">天気情報を取得中...</div>
+          </section>
+        )}
+
+        {weatherError && (
+          <div className="alert alert-warning">
+            <span>⚠️ {weatherError}</span>
+          </div>
+        )}
+
         {weather && (
-          <section className="weather-section">
-            <h2>天気情報</h2>
-            <div className="weather-info">
+          <section className="card weather-card">
+            <h2>🌤️ 天気情報</h2>
+
+            <div className="weather-summary">
+              <p className="weather-main">{getWeatherDescription()}</p>
+              <p className="weather-advice">{getWeatherAdvice()}</p>
+            </div>
+
+            <div className="weather-grid">
               <div className="weather-item">
-                <span className="label">気温:</span>
-                <span className="value">{weather.temperature}°C</span>
+                <span className="label">気温</span>
+                <span className="value">{Math.round(weather.main.temp)}°C</span>
               </div>
               <div className="weather-item">
-                <span className="label">降水量:</span>
-                <span className="value">{weather.precipitation}mm</span>
+                <span className="label">体感温度</span>
+                <span className="value">{Math.round(weather.main.feels_like)}°C</span>
               </div>
               <div className="weather-item">
-                <span className="label">風速:</span>
-                <span className="value">{weather.windSpeed}m/s</span>
+                <span className="label">湿度</span>
+                <span className="value">{weather.main.humidity}%</span>
               </div>
               <div className="weather-item">
-                <span className="label">走りやすさ:</span>
-                <span className="value runability">{weather.runability}</span>
+                <span className="label">風速</span>
+                <span className="value">{(Math.round(weather.wind.speed * 10) / 10).toFixed(1)} m/s</span>
+              </div>
+              <div className="weather-item">
+                <span className="label">雲量</span>
+                <span className="value">{weather.clouds.all}%</span>
               </div>
             </div>
-          </section>
-        )}
-
-        {/* コース提案セクション */}
-        {proposal && (
-          <section className="proposal-section">
-            <h2>コース提案</h2>
-            <div className="proposal-content">
-              <p>{proposal}</p>
-            </div>
-          </section>
-        )}
-
-        {/* 地図セクション */}
-        {latitude !== null && longitude !== null ? (
-          <section className="map-section">
-            <h2>現在地の地図</h2>
-            {/* 
-              TODO: 将来的にGeoJSONを読み込んで提案されたコースをポリラインで表示する
-              例:
-              {
-                "type": "FeatureCollection",
-                "features": [
-                  {
-                    "type": "Feature",
-                    "geometry": {
-                      "type": "LineString",
-                      "coordinates": [
-                        [139.7674, 35.6762],
-                        [139.7700, 35.6800],
-                        [139.7650, 35.6850]
-                      ]
-                    },
-                    "properties": {
-                      "name": "提案コース"
-                    }
-                  }
-                ]
-              }
-            */}
-            <div
-              className="geolonia"
-              data-lat={latitude}
-              data-lng={longitude}
-              data-zoom="14"
-              style={{ height: '300px' }}
-            />
-          </section>
-        ) : (
-          <section className="map-section">
-            <p>位置情報を取得してください。地図を表示します。</p>
           </section>
         )}
       </main>
 
       {/* フッター */}
       <footer className="app-footer">
-        <p>&copy; 2025 天気×ランニングコース提案アプリ</p>
+        <p>
+          &copy; 2025 ランニングコース提案アプリ | Built with React + TypeScript + Vite
+        </p>
       </footer>
     </div>
   )
+}
+
+// TypeScript GeoJSON型定義
+namespace GeoJSON {
+  export interface FeatureCollection {
+    type: 'FeatureCollection'
+    features: Feature[]
+  }
+
+  export interface Feature {
+    type: 'Feature'
+    properties: Record<string, unknown>
+    geometry: Geometry
+  }
+
+  export type Geometry = LineString | Point
+
+  export interface LineString {
+    type: 'LineString'
+    coordinates: [number, number][]
+  }
+
+  export interface Point {
+    type: 'Point'
+    coordinates: [number, number]
+  }
+}
+
+// グローバル型の拡張（Geolonia）
+declare global {
+  interface Window {
+    geolonia?: {
+      onReady(callback: () => void): void
+    }
+  }
 }

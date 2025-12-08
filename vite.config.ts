@@ -7,4 +7,7 @@ export default defineConfig({
   server: {
     port: 5173,
   },
+  define: {
+    // 環境変数を暴露（VITE_* プレフィックス付きのみ）
+  },
 })
