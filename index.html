@@ -19,6 +19,9 @@
     <script type="text/javascript" src="https://cdn.geolonia.com/v1/embed?geolonia-api-key=57e50c6fcf3240359f4cf08862c029d6"></script>
     
     <script>
+      // グローバルな地図インスタンスを保存
+      window.geoloniaMapInstance = null;
+      
       // Geolonia スクリプト読み込み後にグローバルな地図初期化関数を登録
       window.initializeGeoloniaMaps = function() {
         console.log('🗺️ initializeGeoloniaMaps() called');
@@ -49,6 +52,9 @@
               bearing: 0
             });
             
+            // グローバルに地図インスタンスを保存
+            window.geoloniaMapInstance = map;
+            
             map.on('load', function() {
               console.log('✓ Map ' + (index + 1) + ' loaded successfully');
             });
@@ -60,6 +66,88 @@
             console.error('Failed to initialize map ' + (index + 1) + ':', err);
           }
         });
+      };
+      
+      // コースを地図上に表示する関数
+      window.displayCourseOnMap = function(coursePoints) {
+        if (!window.geoloniaMapInstance) {
+          console.error('Map instance not available');
+          return;
+        }
+        
+        const map = window.geoloniaMapInstance;
+        console.log('🗺️ Displaying ' + coursePoints.length + ' course points on map');
+        
+        try {
+          // コースの座標をGeoJSON形式に変換
+          const coordinates = coursePoints.map(function(point) {
+            return [point.lng, point.lat];
+          });
+          
+          // 終点を起点に戻して閉じたループを作成
+          coordinates.push(coordinates[0]);
+          
+          // Polylineレイヤーがすでにあれば削除
+          if (map.getLayer('route')) {
+            map.removeLayer('route');
+          }
+          if (map.getSource('route')) {
+            map.removeSource('route');
+          }
+          
+          // ルートのソースとレイヤーを追加
+          map.addSource('route', {
+            type: 'geojson',
+            data: {
+              type: 'Feature',
+              geometry: {
+                type: 'LineString',
+                coordinates: coordinates
+              },
+              properties: {}
+            }
+          });
+          
+          map.addLayer({
+            id: 'route',
+            type: 'line',
+            source: 'route',
+            paint: {
+              'line-color': '#3b82f6',
+              'line-width': 3,
+              'line-opacity': 0.8
+            }
+          });
+          
+          // マーカーを追加
+          coursePoints.forEach(function(point, idx) {
+            var markerColor = idx === 0 ? '#10b981' : '#ef4444'; // 起点は緑、他は赤
+            var markerSize = idx === 0 ? 35 : 25;
+            
+            var markerElement = document.createElement('div');
+            markerElement.style.width = markerSize + 'px';
+            markerElement.style.height = markerSize + 'px';
+            markerElement.style.backgroundColor = markerColor;
+            markerElement.style.borderRadius = '50%';
+            markerElement.style.border = '2px solid white';
+            markerElement.style.display = 'flex';
+            markerElement.style.alignItems = 'center';
+            markerElement.style.justifyContent = 'center';
+            markerElement.style.color = 'white';
+            markerElement.style.fontSize = '12px';
+            markerElement.style.fontWeight = 'bold';
+            markerElement.textContent = idx;
+            
+            new window.geolonia.Marker({
+              element: markerElement,
+              lngLat: [point.lng, point.lat]
+            }).addTo(map);
+          });
+          
+          console.log('✓ Course displayed on map with ' + coursePoints.length + ' markers');
+        } catch (err) {
+          console.error('Error displaying course on map:', err);
+        }
       };
       
       // Geolonia 読み込み完了後に初期化

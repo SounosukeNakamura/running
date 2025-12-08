@@ -169,6 +169,12 @@ export default function App() {
       const generatedCourse = generateCircularCourse(location, distance, 12)
       setCourse(generatedCourse)
 
+      // 地図にコースを表示
+      if ((window as any).displayCourseOnMap) {
+        console.log('📍 Displaying course on map...')
+        ;(window as any).displayCourseOnMap(generatedCourse)
+      }
+
       // 天気情報を取得
       fetchWeatherForLocation(location)
     } catch (err) {
