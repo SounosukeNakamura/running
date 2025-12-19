@@ -9,11 +9,18 @@
 // 1. ✅ 現在地取得と出発地点の設定（Geolocation API）
 // 2. ✅ 走行時間入力 UI（入力値検証）
 // 3. ✅ 指定時間から走行距離を計算（環境変数の RUNNING_PACE_MIN_PER_KM を使用）
-// 4. ✅ 出発地点中心の周回ルート生成（Haversine 逆計算）
-// 5. ✅ Geolonia 上へのルート描画（ポリライン + マーカー）
-// 6. ✅ OpenWeather API による天気情報表示
-// 7. ✅ 環境変数管理（.env.local + Vercel）
-// 8. ✅ レスポンシブ UI デザイン
+// 4. ✅ 道路ネットワークベースのルート生成（OSRM - Open Source Routing Machine）
+// 5. ✅ スタート＝ゴール地点の周回ルート生成（最適化アルゴリズム）
+// 6. ✅ 指定距離への自動調整（ウェイポイント数の動的調整）
+// 7. ✅ Geolonia 上へのルート描画（ポリライン + マーカー）
+// 8. ✅ OpenWeather API による天気情報表示
+// 9. ✅ 環境変数管理（.env.local + Vercel）
+// 10. ✅ レスポンシブ UI デザイン
+//
+// 【改善点】
+// - 旧: 円形ルート（直線で距離計算）→ 新: 道路ネットワークベース（実際の走行距離）
+// - 旧: ウェイポイント固定数 → 新: 目標距離に応じた動的調整
+// - 旧: 往復概念 → 新: スタート＝ゴール地点の周回ルート
 //
 // 【本番環境】
 // https://running-kappa-kohl.vercel.app
@@ -32,6 +39,7 @@ import {
   validateRunningMinutes,
   validateLocation,
 } from './utils'
+import { generateOptimizedRunningRoute, OptimizedRoute } from './routeOptimizer'
 
 /**
  * メインアプリケーションコンポーネント
@@ -58,6 +66,7 @@ export default function App() {
   // コース情報
   const [course, setCourse] = useState<CoursePoint[]>([])
   const [courseDistance, setCourseDistance] = useState(0)
+  const [optimizedRoute, setOptimizedRoute] = useState<OptimizedRoute | null>(null)
 
   // Geolonia 状態
   const [geoloniaReady, setGeoloniaReady] = useState(false)
@@ -166,6 +175,7 @@ export default function App() {
     setError('')
     setWeatherError('')
     setCourse([])
+    setOptimizedRoute(null)
 
     // バリデーション
     const validation = validateRunningMinutes(runningMinutes)
@@ -182,19 +192,24 @@ export default function App() {
     try {
       setIsGenerating(true)
 
-      // 走行距離を計算
+      // 走行時間から最適化されたルートを生成
       const minutes = parseFloat(runningMinutes)
-      const distance = calculateRunningDistance(minutes)
-      setCourseDistance(distance)
+      console.log(`🚀 Starting optimized route generation for ${minutes} minutes...`)
 
-      // コースを生成
-      const generatedCourse = generateCircularCourse(location, distance, 12)
-      setCourse(generatedCourse)
+      // 新しい最適化エンジンを使用
+      const route = await generateOptimizedRunningRoute(location, minutes)
+      
+      setOptimizedRoute(route)
+      setCourseDistance(route.totalDistance)
 
-      // 地図にコースを表示
+      // ウェイポイント情報をCoursePointに変換（後方互換性）
+      const coursePoints: CoursePoint[] = route.waypoints
+      setCourse(coursePoints)
+
+      // 地図にコースを表示（ルートパスを使用）
       if ((window as any).displayCourseOnMap) {
-        console.log('📍 Displaying course on map...')
-        ;(window as any).displayCourseOnMap(generatedCourse)
+        console.log('📍 Displaying optimized route on map...')
+        ;(window as any).displayCourseOnMap(route.routePath || route.waypoints)
       }
 
       // 天気情報を取得
@@ -389,18 +404,38 @@ export default function App() {
                 <span className="value">{courseDistance.toFixed(2)} km</span>
               </div>
               <div className="info-item">
-                <span className="label">ポイント数:</span>
+                <span className="label">ウェイポイント数:</span>
                 <span className="value">{course.length} 地点</span>
               </div>
+              {optimizedRoute && (
+                <div className="info-item">
+                  <span className="label">推定走行時間:</span>
+                  <span className="value">{Math.round(optimizedRoute.totalDistance * 6)} 分</span>
+                </div>
+              )}
             </div>
+
+            {/* ルート最適化情報 */}
+            {optimizedRoute && (
+              <div className="optimization-info">
+                <h3>📊 ルート最適化情報</h3>
+                <ul>
+                  <li>✅ OSRMによる道路ネットワークベースのルート生成</li>
+                  <li>✅ スタート地点 = ゴール地点（現在地）の周回ルート</li>
+                  <li>✅ 指定距離への自動調整（{optimizedRoute.totalDistance.toFixed(2)}km）</li>
+                  <li>✅ {optimizedRoute.steps.length}個のウェイポイントを経由</li>
+                  <li>✅ 実際の道路に沿ったナビゲーション対応</li>
+                </ul>
+              </div>
+            )}
 
             {/* コースの詳細情報 */}
             <details>
-              <summary>コースの詳細座標</summary>
+              <summary>コースの詳細座標（{course.length}個のウェイポイント）</summary>
               <div className="course-details">
                 {course.map((point, idx) => (
                   <div key={idx} className="point-info">
-                    <strong>ポイント {idx}:</strong> {point.lat.toFixed(6)}, {point.lng.toFixed(6)}
+                    <strong>ウェイポイント {idx}:</strong> {point.lat.toFixed(6)}, {point.lng.toFixed(6)}
                   </div>
                 ))}
               </div>

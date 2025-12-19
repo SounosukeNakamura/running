@@ -543,3 +543,113 @@ details[open] > summary {
   background-color: #f0f4ff;
   margin-bottom: 1rem;
 }
+
+/* ルート最適化情報 */
+.optimization-info {
+  margin-top: 1.5rem;
+  padding: 1.5rem;
+  background: linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 100%);
+  border-left: 5px solid #4caf50;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(76, 175, 80, 0.15);
+}
+
+.optimization-info h3 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  color: #2e7d32;
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.optimization-info h3::before {
+  content: '✓';
+  display: inline-block;
+  width: 24px;
+  height: 24px;
+  background-color: #4caf50;
+  color: white;
+  border-radius: 50%;
+  text-align: center;
+  line-height: 24px;
+  font-size: 0.9rem;
+  font-weight: bold;
+}
+
+.optimization-info ul {
+  margin: 0;
+  padding-left: 1.5rem;
+  list-style: none;
+}
+
+.optimization-info li {
+  margin: 0.5rem 0;
+  color: #1b5e20;
+  font-size: 0.95rem;
+  padding-left: 1.5rem;
+  position: relative;
+}
+
+.optimization-info li::before {
+  content: '✓';
+  position: absolute;
+  left: 0;
+  color: #4caf50;
+  font-weight: bold;
+}
+
+/* コース情報 */
+.course-info {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  background-color: #f8f9fa;
+  border-radius: 6px;
+  border-left: 4px solid #667eea;
+}
+
+.info-item .label {
+  font-weight: 600;
+  color: #667eea;
+}
+
+.info-item .value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #2c3e50;
+  margin-left: 1rem;
+}
+
+/* コース詳細 */
+.course-details {
+  max-height: 400px;
+  overflow-y: auto;
+  padding: 1rem;
+  background-color: #f8f9fa;
+  border-radius: 6px;
+}
+
+.point-info {
+  padding: 0.75rem;
+  margin: 0.5rem 0;
+  background-color: white;
+  border-radius: 4px;
+  font-family: 'Monaco', 'Courier New', monospace;
+  font-size: 0.9rem;
+  border-left: 3px solid #2196f3;
+  word-break: break-all;
+}
+
+.point-info strong {
+  color: #2196f3;
+}
