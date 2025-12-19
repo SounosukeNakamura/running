@@ -39,7 +39,7 @@ import {
   validateRunningMinutes,
   validateLocation,
 } from './utils'
-import { generateOptimizedRunningRoute, OptimizedRoute } from './routeOptimizer'
+import { generateOptimizedClosedRoute, OptimizedRoute } from './routeOptimizer.v2'
 
 /**
  * メインアプリケーションコンポーネント
@@ -196,20 +196,20 @@ export default function App() {
       const minutes = parseFloat(runningMinutes)
       console.log(`🚀 Starting optimized route generation for ${minutes} minutes...`)
 
-      // 新しい最適化エンジンを使用
-      const route = await generateOptimizedRunningRoute(location, minutes)
-      
+      // 新しい最適化エンジン（v2）を使用
+      const route = await generateOptimizedClosedRoute(location, minutes)
+
       setOptimizedRoute(route)
       setCourseDistance(route.totalDistance)
 
       // ウェイポイント情報をCoursePointに変換（後方互換性）
-      const coursePoints: CoursePoint[] = route.waypoints
+      const coursePoints: CoursePoint[] = (route.waypoints || []) as CoursePoint[]
       setCourse(coursePoints)
 
       // 地図にコースを表示（ルートパスを使用）
       if ((window as any).displayCourseOnMap) {
-        console.log('📍 Displaying optimized route on map...')
-        ;(window as any).displayCourseOnMap(route.routePath || route.waypoints)
+        console.log('📍 Displaying optimized closed route on map (hide waypoint markers)...')
+        ;(window as any).displayCourseOnMap(route.routePath || route.waypoints, { hideWaypointMarkers: true })
       }
 
       // 天気情報を取得
@@ -410,7 +410,7 @@ export default function App() {
               {optimizedRoute && (
                 <div className="info-item">
                   <span className="label">推定走行時間:</span>
-                  <span className="value">{Math.round(optimizedRoute.totalDistance * 6)} 分</span>
+                  <span className="value">{Math.round(optimizedRoute.estimatedTime)} 分</span>
                 </div>
               )}
             </div>
@@ -423,7 +423,8 @@ export default function App() {
                   <li>✅ OSRMによる道路ネットワークベースのルート生成</li>
                   <li>✅ スタート地点 = ゴール地点（現在地）の周回ルート</li>
                   <li>✅ 指定距離への自動調整（{optimizedRoute.totalDistance.toFixed(2)}km）</li>
-                  <li>✅ {optimizedRoute.steps.length}個のウェイポイントを経由</li>
+                  <li>✅ {optimizedRoute.waypoints.length}個のウェイポイントを内部で使用</li>
+                  <li>✅ {optimizedRoute.segments.length}区間を経由（全区間が道路に沿います）</li>
                   <li>✅ 実際の道路に沿ったナビゲーション対応</li>
                 </ul>
               </div>

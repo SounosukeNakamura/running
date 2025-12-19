@@ -69,7 +69,8 @@
       };
       
       // コースを地図上に表示する関数
-      window.displayCourseOnMap = function(coursePoints) {
+      // 第二引数にオプションを渡せます: { hideWaypointMarkers: true }
+      window.displayCourseOnMap = function(coursePoints, options) {
         if (!window.geoloniaMapInstance) {
           console.error('Map instance not available');
           return;
@@ -119,11 +120,15 @@
             }
           });
           
-          // マーカーを追加
+          // マーカーを追加（オプションでウェイポイントを非表示にできる）
+          var hideWaypoints = options && options.hideWaypointMarkers === true;
           coursePoints.forEach(function(point, idx) {
+            // スタート（インデックス0）は常に表示
+            if (hideWaypoints && idx !== 0) return;
+
             var markerColor = idx === 0 ? '#10b981' : '#ef4444'; // 起点は緑、他は赤
             var markerSize = idx === 0 ? 35 : 25;
-            
+
             var markerElement = document.createElement('div');
             markerElement.style.width = markerSize + 'px';
             markerElement.style.height = markerSize + 'px';
@@ -137,7 +142,7 @@
             markerElement.style.fontSize = '12px';
             markerElement.style.fontWeight = 'bold';
             markerElement.textContent = idx;
-            
+
             try {
               new window.geolonia.Marker({
                 element: markerElement
