@@ -39,6 +39,7 @@ import {
   validateRunningMinutes,
   validateLocation,
   geocodeAddress,
+  reverseGeocodeLocation,
 } from './utils'
 import { generateOptimizedClosedRoute, OptimizedRoute } from './routeOptimizer.v2'
 
@@ -51,6 +52,7 @@ export default function App() {
 
   // 位置情報
   const [location, setLocation] = useState<Location | null>(null)
+  const [locationAddress, setLocationAddress] = useState('')
   const [locationLoading, setLocationLoading] = useState(true)
   const [locationError, setLocationError] = useState('')
 
@@ -84,6 +86,25 @@ export default function App() {
   useEffect(() => {
     initializeLocation()
   }, [])
+
+  /**
+   * 現在地から住所を取得（location 変更時）
+   */
+  useEffect(() => {
+    if (!location) return
+
+    const fetchAddress = async () => {
+      try {
+        const address = await reverseGeocodeLocation(location)
+        setLocationAddress(address)
+      } catch (error) {
+        console.error('Failed to get address for location:', error)
+        setLocationAddress(`${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}`)
+      }
+    }
+
+    fetchAddress()
+  }, [location])
 
   /**
    * 地図表示の初期化（Geolonia）
@@ -321,7 +342,10 @@ export default function App() {
               <div className="location-display">
                 <p>
                   <strong>現在地：</strong>
-                  緯度 {location.lat.toFixed(4)}, 経度 {location.lng.toFixed(4)}
+                  {locationAddress}
+                </p>
+                <p style={{ fontSize: '0.9em', color: '#666', marginTop: '0.5em' }}>
+                  （緯度 {location.lat.toFixed(4)}, 経度 {location.lng.toFixed(4)}）
                 </p>
               </div>
 

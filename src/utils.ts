@@ -163,6 +163,38 @@ export async function fetchWeatherData(
 }
 
 /**
+ * Geolonia Reverse Geocoding APIで緯度経度から住所を取得
+ * @param location 緯度・経度
+ * @returns 住所文字列
+ */
+export async function reverseGeocodeLocation(location: Location): Promise<string> {
+  const url = new URL('https://api.geolonia.com/v1/reverse')
+  url.searchParams.set('lat', location.lat.toString())
+  url.searchParams.set('lng', location.lng.toString())
+
+  try {
+    const response = await fetch(url.toString())
+    if (!response.ok) {
+      throw new Error(`Reverse Geocoding API error: ${response.status}`)
+    }
+
+    const data = await response.json()
+
+    // Geolonia APIの応答形式: { properties: { name } }
+    if (data.properties && data.properties.name) {
+      return data.properties.name
+    }
+
+    // フォールバック：座標表示
+    return `${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}`
+  } catch (error) {
+    console.error('Reverse geocoding error:', error)
+    // エラー時は座標を返す
+    return `${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}`
+  }
+}
+
+/**
  * Geolonia Geocoding APIで住所から位置情報を取得
  * @param address 住所文字列（日本語対応）
  * @returns 緯度・経度
