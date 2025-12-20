@@ -262,6 +262,13 @@ export async function reverseGeocodeLocation(location: Location): Promise<string
           chome = houseNum + '丁目'
           console.log(`  ✓ House Number (丁目): ${chome}`)
         }
+      } else if (data.display_name) {
+        // display_name から「〇丁目」パターンを抽出
+        const chomeMatch = data.display_name.match(/(\d+丁目)/);
+        if (chomeMatch) {
+          chome = chomeMatch[1]
+          console.log(`  ✓ Chome from display_name (丁目): ${chome}`)
+        }
       }
       if (chome) parts.push(chome)
 
@@ -282,7 +289,7 @@ export async function reverseGeocodeLocation(location: Location): Promise<string
 }
 
 /**
- * Geolonia Geocoding APIで住所から位置情報を取得
+ * OpenStreetMap Nominatim APIで住所から位置情報を取得
  * @param address 住所文字列（日本語対応）
  * @returns 緯度・経度
  */
@@ -291,27 +298,38 @@ export async function geocodeAddress(address: string): Promise<Location> {
     throw new Error('住所を入力してください')
   }
 
-  const url = new URL('https://api.geolonia.com/v1/geocode')
-  url.searchParams.set('address', address)
+  const url = new URL('https://nominatim.openstreetmap.org/search')
+  url.searchParams.set('q', address)
+  url.searchParams.set('format', 'json')
+  url.searchParams.set('accept-language', 'ja')
+  url.searchParams.set('countrycodes', 'jp') // 日本のみに限定
 
   try {
+    console.log(`🔄 Geocoding address: "${address}"`)
     const response = await fetch(url.toString())
     if (!response.ok) {
-      throw new Error(`Geocoding API error: ${response.status}`)
+      throw new Error(`Nominatim API error: ${response.status}`)
     }
 
     const data = await response.json()
+    console.log('Nominatim geocoding response:', data)
 
-    // Geolonia APIの応答形式: { geometry: { coordinates: [lng, lat] } }
-    if (data.geometry && data.geometry.coordinates) {
-      const [lng, lat] = data.geometry.coordinates
-      return { lat, lng }
+    // Nominatim APIの応答形式: { lat, lon } の配列
+    if (data && data.length > 0) {
+      const result = data[0]
+      const location = {
+        lat: parseFloat(result.lat),
+        lng: parseFloat(result.lon)
+      }
+      console.log(`✓ Address found: ${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}`)
+      return location
     }
 
     throw new Error('住所が見つかりませんでした')
   } catch (error) {
-    console.error('Geocoding error:', error)
-    throw new Error('住所の検索に失敗しました。別の住所を試してください。')
+    console.error('⚠️ Geocoding error:', error)
+    const errorMsg = error instanceof Error ? error.message : '住所の検索に失敗しました'
+    throw new Error(`${errorMsg}。別の住所を試してください。`)
   }
 }
 
