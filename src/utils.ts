@@ -165,7 +165,7 @@ export async function fetchWeatherData(
 /**
  * OpenStreetMap Nominatim APIで緯度経度から住所を取得
  * @param location 緯度・経度
- * @returns 住所文字列（都道府県 市区町村 町名の形式）
+ * @returns 住所文字列（都道府県 市区町村 町名 丁目の形式）
  */
 export async function reverseGeocodeLocation(location: Location): Promise<string> {
   const url = new URL('https://nominatim.openstreetmap.org/reverse')
@@ -193,34 +193,50 @@ export async function reverseGeocodeLocation(location: Location): Promise<string
       // 1. 都道府県（state）
       if (addr.state) {
         parts.push(addr.state)
-        console.log(`  ✓ State: ${addr.state}`)
+        console.log(`  ✓ State (都道府県): ${addr.state}`)
       }
       
-      // 2. 市区町村（city or town）
+      // 2. 市区町村（city, city_district, town など）
+      let municipality = ''
       if (addr.city) {
-        parts.push(addr.city)
-        console.log(`  ✓ City: ${addr.city}`)
+        municipality = addr.city
+        console.log(`  ✓ City (市区町村): ${addr.city}`)
+      } else if (addr.city_district) {
+        municipality = addr.city_district
+        console.log(`  ✓ City District (市区町村): ${addr.city_district}`)
       } else if (addr.town) {
-        parts.push(addr.town)
-        console.log(`  ✓ Town: ${addr.town}`)
+        municipality = addr.town
+        console.log(`  ✓ Town (市区町村): ${addr.town}`)
       }
+      if (municipality) parts.push(municipality)
       
-      // 3. 町名（suburb or village or hamlet, ただし amenity や building は除外）
-      // amenity（施設名）や building（建物名）は含めない
-      let neighborhoodFound = false
+      // 3. 町名（suburb, neighbourhood など）
+      let townName = ''
       if (addr.suburb && !addr.amenity) {
-        parts.push(addr.suburb)
-        console.log(`  ✓ Suburb: ${addr.suburb}`)
-        neighborhoodFound = true
-      } else if (addr.village && !neighborhoodFound) {
-        parts.push(addr.village)
-        console.log(`  ✓ Village: ${addr.village}`)
-        neighborhoodFound = true
-      } else if (addr.hamlet && !neighborhoodFound) {
-        parts.push(addr.hamlet)
-        console.log(`  ✓ Hamlet: ${addr.hamlet}`)
-        neighborhoodFound = true
+        townName = addr.suburb
+        console.log(`  ✓ Suburb (町名): ${addr.suburb}`)
+      } else if (addr.neighbourhood && !addr.amenity) {
+        townName = addr.neighbourhood
+        console.log(`  ✓ Neighbourhood (町名): ${addr.neighbourhood}`)
+      } else if (addr.village && !addr.amenity) {
+        townName = addr.village
+        console.log(`  ✓ Village (町名): ${addr.village}`)
       }
+      if (townName) parts.push(townName)
+      
+      // 4. 丁目（chome, quarter, block など）
+      let chome = ''
+      if (addr.chome) {
+        chome = addr.chome
+        console.log(`  ✓ Chome (丁目): ${addr.chome}`)
+      } else if (addr.quarter) {
+        chome = addr.quarter
+        console.log(`  ✓ Quarter (丁目): ${addr.quarter}`)
+      } else if (addr.block) {
+        chome = addr.block
+        console.log(`  ✓ Block (丁目): ${addr.block}`)
+      }
+      if (chome) parts.push(chome)
 
       const address = parts.join(' ')
       if (address) {
