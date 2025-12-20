@@ -233,21 +233,21 @@ export async function reverseGeocodeLocation(location: Location): Promise<string
       }
       if (municipality) parts.push(municipality)
       
-      // 3. 町名（suburb, neighbourhood など、amenity は除外）
+      // 3. 町名（suburb, neighbourhood など）
       let townName = ''
-      if (addr.suburb && !addr.amenity) {
+      if (addr.suburb) {
         townName = addr.suburb
         console.log(`  ✓ Suburb (町名): ${addr.suburb}`)
-      } else if (addr.neighbourhood && !addr.amenity) {
+      } else if (addr.neighbourhood) {
         townName = addr.neighbourhood
         console.log(`  ✓ Neighbourhood (町名): ${addr.neighbourhood}`)
-      } else if (addr.village && !addr.amenity) {
+      } else if (addr.village) {
         townName = addr.village
         console.log(`  ✓ Village (町名): ${addr.village}`)
       }
       if (townName) parts.push(townName)
       
-      // 4. 丁目（chome, quarter, block など）
+      // 4. 丁目（chome, quarter, house_number など）
       let chome = ''
       if (addr.chome) {
         chome = addr.chome
@@ -255,9 +255,13 @@ export async function reverseGeocodeLocation(location: Location): Promise<string
       } else if (addr.quarter) {
         chome = addr.quarter
         console.log(`  ✓ Quarter (丁目): ${addr.quarter}`)
-      } else if (addr.block) {
-        chome = addr.block
-        console.log(`  ✓ Block (丁目): ${addr.block}`)
+      } else if (addr.house_number) {
+        // house_number から丁目を抽出（例：「1」→ 「1丁目」）
+        const houseNum = addr.house_number
+        if (!houseNum.includes('丁目') && !isNaN(Number(houseNum))) {
+          chome = houseNum + '丁目'
+          console.log(`  ✓ House Number (丁目): ${chome}`)
+        }
       }
       if (chome) parts.push(chome)
 
