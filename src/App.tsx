@@ -38,6 +38,7 @@ import {
   fetchWeatherData,
   validateRunningMinutes,
   validateLocation,
+  geocodeAddress,
 } from './utils'
 import { generateOptimizedClosedRoute, OptimizedRoute } from './routeOptimizer.v2'
 
@@ -55,8 +56,8 @@ export default function App() {
 
   // フォーム入力
   const [runningMinutes, setRunningMinutes] = useState('')
-  const [manualLat, setManualLat] = useState('')
-  const [manualLng, setManualLng] = useState('')
+  const [manualAddress, setManualAddress] = useState('')
+  const [isGeocodingLoading, setIsGeocodingLoading] = useState(false)
 
   // 天気情報
   const [weather, setWeather] = useState<WeatherData | null>(null)
@@ -143,26 +144,31 @@ export default function App() {
   }
 
   /**
-   * 手動で位置情報を設定
+   * 住所から位置情報を検索して設定
    */
-  const handleSetManualLocation = (e: any) => {
+  const handleSetLocationFromAddress = async (e: any) => {
     e.preventDefault()
     setError('')
 
-    const validation = validateLocation(manualLat, manualLng)
-    if (!validation.valid) {
-      setError(validation.error || '位置情報が無効です')
+    if (!manualAddress.trim()) {
+      setError('住所を入力してください')
       return
     }
 
-    setLocation({
-      lat: parseFloat(manualLat),
-      lng: parseFloat(manualLng),
-    })
-
-    setManualLat('')
-    setManualLng('')
-    setLocationError('')
+    try {
+      setIsGeocodingLoading(true)
+      const newLocation = await geocodeAddress(manualAddress)
+      setLocation(newLocation)
+      setManualAddress('')
+      setLocationError('')
+      console.log(`✓ Location set from address: ${newLocation.lat.toFixed(4)}, ${newLocation.lng.toFixed(4)}`)
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : '住所の検索に失敗しました'
+      setError(errorMsg)
+      console.error('Geocoding error:', err)
+    } finally {
+      setIsGeocodingLoading(false)
+    }
   }
 
   // ===== コース生成関連の関数 =====
@@ -337,32 +343,25 @@ export default function App() {
 
           {/* 手動位置情報入力 */}
           <div className="manual-location">
-            <h3>位置情報を手動で設定</h3>
-            <form onSubmit={handleSetManualLocation} className="form-inline">
+            <h3>住所から位置情報を検索</h3>
+            <form onSubmit={handleSetLocationFromAddress} className="form-inline">
               <div className="form-group">
-                <label htmlFor="manual-lat">緯度:</label>
+                <label htmlFor="manual-address">住所:</label>
                 <input
-                  id="manual-lat"
-                  type="number"
-                  step="0.0001"
-                  placeholder="35.6762"
-                  value={manualLat}
-                  onChange={(e) => setManualLat(e.target.value)}
+                  id="manual-address"
+                  type="text"
+                  placeholder="例：東京都渋谷区"
+                  value={manualAddress}
+                  onChange={(e) => setManualAddress(e.target.value)}
+                  disabled={isGeocodingLoading}
                 />
               </div>
-              <div className="form-group">
-                <label htmlFor="manual-lng">経度:</label>
-                <input
-                  id="manual-lng"
-                  type="number"
-                  step="0.0001"
-                  placeholder="139.7674"
-                  value={manualLng}
-                  onChange={(e) => setManualLng(e.target.value)}
-                />
-              </div>
-              <button type="submit" className="btn btn-secondary">
-                設定
+              <button 
+                type="submit" 
+                className="btn btn-secondary"
+                disabled={isGeocodingLoading}
+              >
+                {isGeocodingLoading ? '検索中...' : '検索'}
               </button>
             </form>
           </div>

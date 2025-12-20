@@ -162,6 +162,40 @@ export async function fetchWeatherData(
   return response.json()
 }
 
+/**
+ * Geolonia Geocoding APIで住所から位置情報を取得
+ * @param address 住所文字列（日本語対応）
+ * @returns 緯度・経度
+ */
+export async function geocodeAddress(address: string): Promise<Location> {
+  if (!address.trim()) {
+    throw new Error('住所を入力してください')
+  }
+
+  const url = new URL('https://api.geolonia.com/v1/geocode')
+  url.searchParams.set('address', address)
+
+  try {
+    const response = await fetch(url.toString())
+    if (!response.ok) {
+      throw new Error(`Geocoding API error: ${response.status}`)
+    }
+
+    const data = await response.json()
+
+    // Geolonia APIの応答形式: { geometry: { coordinates: [lng, lat] } }
+    if (data.geometry && data.geometry.coordinates) {
+      const [lng, lat] = data.geometry.coordinates
+      return { lat, lng }
+    }
+
+    throw new Error('住所が見つかりませんでした')
+  } catch (error) {
+    console.error('Geocoding error:', error)
+    throw new Error('住所の検索に失敗しました。別の住所を試してください。')
+  }
+}
+
 // ===== バリデーション関数 =====
 
 /**
