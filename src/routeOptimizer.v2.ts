@@ -398,7 +398,7 @@ async function optimizeWaypointCount(
  * 特徴：
  * - スタート = ゴール地点
  * - 全区間が OSRM で道路ネットワークに沿う
- * - 走行時間が入力値を超えない
+ * - 走行時間が入力値を超えない（最大許容値以下に調整）
  * - 指定時間内で最大距離を実現
  */
 export async function generateOptimizedClosedRoute(
@@ -414,17 +414,69 @@ export async function generateOptimizedClosedRoute(
     `\n🚀 Starting closed route generation (${maxRunningMinutes} min, ${startLocation.lat.toFixed(4)}, ${startLocation.lng.toFixed(4)})`
   )
 
-  // ウェイポイント数を最適化
-  const { optimalWaypoints, routeInfo } = await optimizeWaypointCount(
-    startLocation,
-    maxRunningMinutes,
-    initialWaypointCount
-  )
+  // 最大許容時間（秒）：丸め誤差を避けるため5秒のマージンを持つ
+  const maxDurationSeconds = maxRunningMinutes * 60 - 5
+  console.log(`⏱️ Max duration: ${maxDurationSeconds}s (${maxRunningMinutes}min - 5s buffer)`)
 
-  console.log(`\n✅ Optimal configuration found:`)
+  // スケール係数を使った段階的な再試行
+  const MAX_RETRY = 10
+  let scale = 1.0
+  let routeInfo: { totalDistance: number; estimatedTime: number; segments: RouteSegment[] } | null = null
+  let optimalWaypoints: Location[] = []
+
+  for (let attempt = 0; attempt < MAX_RETRY; attempt++) {
+    console.log(`\n🔄 Attempt ${attempt + 1}/${MAX_RETRY} (scale: ${scale.toFixed(2)})`)
+
+    try {
+      // ウェイポイント数を最適化（スケール係数を適用）
+      const { optimalWaypoints: waypoints, routeInfo: info } = await optimizeWaypointCount(
+        startLocation,
+        maxRunningMinutes * scale,
+        initialWaypointCount
+      )
+
+      optimalWaypoints = waypoints
+      routeInfo = info
+
+      console.log(`   Distance: ${routeInfo.totalDistance.toFixed(2)}km, Time: ${routeInfo.estimatedTime.toFixed(1)}min`)
+
+      // 推定時間が制限以内か確認
+      const estimatedDurationSeconds = routeInfo.estimatedTime * 60
+      if (estimatedDurationSeconds <= maxDurationSeconds) {
+        console.log(`   ✅ Time OK: ${estimatedDurationSeconds.toFixed(0)}s <= ${maxDurationSeconds}s`)
+        break
+      } else {
+        console.log(`   ⚠️ Time exceeded: ${estimatedDurationSeconds.toFixed(0)}s > ${maxDurationSeconds}s`)
+        // スケールを縮小して再試行
+        scale *= 0.90
+      }
+    } catch (error) {
+      console.error(`   ❌ Error in attempt ${attempt + 1}:`, error)
+      // エラーが出た場合もスケールを縮小して再試行
+      scale *= 0.90
+    }
+  }
+
+  // 最終チェック
+  if (!routeInfo || !optimalWaypoints.length) {
+    throw new Error(`Failed to generate route within ${maxRunningMinutes} minutes. Try increasing the time or retry.`)
+  }
+
+  const finalDurationSeconds = routeInfo.estimatedTime * 60
+  if (finalDurationSeconds > maxDurationSeconds) {
+    console.error(
+      `❌ Final time check failed: ${finalDurationSeconds.toFixed(0)}s > ${maxDurationSeconds}s`
+    )
+    throw new Error(
+      `指定時間内に収まるルートを生成できませんでした。時間を増やすか再試行してください。`
+    )
+  }
+
+  console.log(`\n✅ Route generation succeeded:`)
   console.log(`   Waypoints: ${optimalWaypoints.length}`)
   console.log(`   Distance: ${routeInfo.totalDistance.toFixed(2)}km`)
-  console.log(`   Estimated time: ${routeInfo.estimatedTime.toFixed(1)}min`)
+  console.log(`   Estimated time: ${routeInfo.estimatedTime.toFixed(1)}min (${finalDurationSeconds.toFixed(0)}s)`)
+  console.log(`   Max allowed: ${maxRunningMinutes}min (${maxDurationSeconds}s)`)
 
   // 全体ルートの詳細パスを取得（スタートを先頭に入れて閉じた配列を作る）
   const closedWaypoints = [startLocation, ...optimalWaypoints, startLocation]
