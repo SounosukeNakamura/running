@@ -183,12 +183,14 @@ export async function reverseGeocodeLocation(location: Location): Promise<string
     }
 
     const data = await response.json()
-    console.log('Nominatim response address:', data.address)
+    console.log('Nominatim response address:', JSON.stringify(data.address, null, 2))
 
     // address コンポーネントから必要な要素を抽出
     if (data.address) {
       const addr = data.address
       const parts: string[] = []
+      
+      console.log('=== Address Component Analysis ===')
       
       // 1. 都道府県（state）
       if (addr.state) {
@@ -207,10 +209,13 @@ export async function reverseGeocodeLocation(location: Location): Promise<string
       } else if (addr.town) {
         municipality = addr.town
         console.log(`  ✓ Town (市区町村): ${addr.town}`)
+      } else if (addr.county) {
+        municipality = addr.county
+        console.log(`  ✓ County (市区町村): ${addr.county}`)
       }
       if (municipality) parts.push(municipality)
       
-      // 3. 町名（suburb, neighbourhood など）
+      // 3. 町名（suburb, neighbourhood, village など）
       let townName = ''
       if (addr.suburb && !addr.amenity) {
         townName = addr.suburb
@@ -224,7 +229,7 @@ export async function reverseGeocodeLocation(location: Location): Promise<string
       }
       if (townName) parts.push(townName)
       
-      // 4. 丁目（chome, quarter, block など）
+      // 4. 丁目（chome, quarter, block, house_number など）
       let chome = ''
       if (addr.chome) {
         chome = addr.chome
@@ -240,7 +245,8 @@ export async function reverseGeocodeLocation(location: Location): Promise<string
 
       const address = parts.join(' ')
       if (address) {
-        console.log(`✓ Formatted address: ${address}`)
+        console.log(`✓ Final address: ${address}`)
+        console.log('================================')
         return address
       }
     }
