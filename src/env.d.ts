@@ -24,6 +24,8 @@ interface ImportMetaEnv {
   /** ランニング想定ペース（分/km）- オプション */
   readonly VITE_RUNNING_PACE_MIN_PER_KM?: string
 }
+
+interface ImportMeta {
   readonly env: ImportMetaEnv
 }
 
