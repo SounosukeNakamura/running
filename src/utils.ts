@@ -165,7 +165,7 @@ export async function fetchWeatherData(
 /**
  * OpenStreetMap Nominatim APIで緯度経度から住所を取得
  * @param location 緯度・経度
- * @returns 住所文字列
+ * @returns 住所文字列（都道府県 市区町村 町名の形式）
  */
 export async function reverseGeocodeLocation(location: Location): Promise<string> {
   const url = new URL('https://nominatim.openstreetmap.org/reverse')
@@ -173,6 +173,7 @@ export async function reverseGeocodeLocation(location: Location): Promise<string
   url.searchParams.set('lon', location.lng.toString())
   url.searchParams.set('format', 'json')
   url.searchParams.set('accept-language', 'ja')
+  url.searchParams.set('addressdetails', '1')
 
   try {
     console.log(`🔄 Reverse geocoding: ${location.lat}, ${location.lng}`)
@@ -182,40 +183,53 @@ export async function reverseGeocodeLocation(location: Location): Promise<string
     }
 
     const data = await response.json()
-    console.log('Nominatim response:', data)
+    console.log('Nominatim response address:', data.address)
 
-    // display_name を優先的に使用（日本の場合、都道府県から始まる形式）
-    if (data.display_name) {
-      // 日本の住所の場合、最初の部分（都道府県から市区町村まで）を抽出
-      const parts = data.display_name.split(',').map((p: string) => p.trim())
-      // 最初の3つの部分を使用（都道府県、市区町村、町名など）
-      const address = parts.slice(0, 3).join('')
-      
-      if (address && !address.includes('Japan')) {
-        console.log(`✓ Address found: ${address}`)
-        return address
-      }
-    }
-
-    // 代替案：address コンポーネントから構築
+    // address コンポーネントから必要な要素を抽出
     if (data.address) {
       const addr = data.address
-      const parts = []
+      const parts: string[] = []
       
-      // 都道府県
-      if (addr.state) parts.push(addr.state)
-      // 市区町村
-      if (addr.city) parts.push(addr.city)
-      else if (addr.town) parts.push(addr.town)
+      // 1. 都道府県（state）
+      if (addr.state) {
+        parts.push(addr.state)
+        console.log(`  ✓ State: ${addr.state}`)
+      }
       
-      const address = parts.join('')
+      // 2. 市区町村（city or town）
+      if (addr.city) {
+        parts.push(addr.city)
+        console.log(`  ✓ City: ${addr.city}`)
+      } else if (addr.town) {
+        parts.push(addr.town)
+        console.log(`  ✓ Town: ${addr.town}`)
+      }
+      
+      // 3. 町名（suburb or village or hamlet, ただし amenity や building は除外）
+      // amenity（施設名）や building（建物名）は含めない
+      let neighborhoodFound = false
+      if (addr.suburb && !addr.amenity) {
+        parts.push(addr.suburb)
+        console.log(`  ✓ Suburb: ${addr.suburb}`)
+        neighborhoodFound = true
+      } else if (addr.village && !neighborhoodFound) {
+        parts.push(addr.village)
+        console.log(`  ✓ Village: ${addr.village}`)
+        neighborhoodFound = true
+      } else if (addr.hamlet && !neighborhoodFound) {
+        parts.push(addr.hamlet)
+        console.log(`  ✓ Hamlet: ${addr.hamlet}`)
+        neighborhoodFound = true
+      }
+
+      const address = parts.join(' ')
       if (address) {
-        console.log(`✓ Address found: ${address}`)
+        console.log(`✓ Formatted address: ${address}`)
         return address
       }
     }
 
-    console.warn('No address found in Nominatim response')
+    console.warn('No address components found in Nominatim response')
     return '住所を取得できませんでした'
   } catch (error) {
     console.error('⚠️ Reverse geocoding error:', error)
