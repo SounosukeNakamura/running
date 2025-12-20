@@ -184,6 +184,7 @@ export async function reverseGeocodeLocation(location: Location): Promise<string
 
     const data = await response.json()
     console.log('Nominatim response address:', JSON.stringify(data.address, null, 2))
+    console.log('Nominatim response display_name:', data.display_name)
 
     // address コンポーネントから必要な要素を抽出
     if (data.address) {
@@ -192,13 +193,30 @@ export async function reverseGeocodeLocation(location: Location): Promise<string
       
       console.log('=== Address Component Analysis ===')
       
-      // 1. 都道府県（state）
+      // 1. 都道府県（state または display_name から抽出）
+      let prefecture = ''
       if (addr.state) {
-        parts.push(addr.state)
+        prefecture = addr.state
         console.log(`  ✓ State (都道府県): ${addr.state}`)
+      } else if (data.display_name) {
+        // display_name から都道府県を抽出（日本の場合、カンマで分割）
+        // 例：「千住旭町, 足立区, 東京都, 123-1234, 日本」
+        const displayParts = data.display_name.split(',').map((p: string) => p.trim())
+        // 日本の住所は「町名, 市区町村, 都道府県, 郵便番号, 国」の順序
+        // 逆順から探す（国から数えて4番目が都道府県）
+        for (let i = displayParts.length - 1; i >= 0; i--) {
+          const part = displayParts[i]
+          // 「都」「道」「府」「県」を含む要素を都道府県として抽出
+          if ((part.includes('都') || part.includes('道') || part.includes('府') || part.includes('県')) && !part.includes('日本')) {
+            prefecture = part
+            console.log(`  ✓ Prefecture (都道府県) from display_name: ${part}`)
+            break
+          }
+        }
       }
+      if (prefecture) parts.push(prefecture)
       
-      // 2. 市区町村（city, city_district, town など）
+      // 2. 市区町村（city など）
       let municipality = ''
       if (addr.city) {
         municipality = addr.city
@@ -215,7 +233,7 @@ export async function reverseGeocodeLocation(location: Location): Promise<string
       }
       if (municipality) parts.push(municipality)
       
-      // 3. 町名（suburb, neighbourhood, village など）
+      // 3. 町名（suburb, neighbourhood など、amenity は除外）
       let townName = ''
       if (addr.suburb && !addr.amenity) {
         townName = addr.suburb
@@ -229,7 +247,7 @@ export async function reverseGeocodeLocation(location: Location): Promise<string
       }
       if (townName) parts.push(townName)
       
-      // 4. 丁目（chome, quarter, block, house_number など）
+      // 4. 丁目（chome, quarter, block など）
       let chome = ''
       if (addr.chome) {
         chome = addr.chome
