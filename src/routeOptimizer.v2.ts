@@ -267,8 +267,9 @@ async function evaluateRoute(
   estimatedTime: number
   segments: RouteSegment[]
 }> {
-  // ウェイポイント配列を閉じたルートに変換（最後にスタートに戻す）
-  const closedWaypoints = [...waypoints, startLocation]
+  // ウェイポイント配列を閉じたルートに変換（スタートを先頭に追加して最後に戻す）
+  // これにより start -> wp0 -> wp1 -> ... -> wpN -> start の全区間を評価します
+  const closedWaypoints = [startLocation, ...waypoints, startLocation]
 
   // 各セグメント間の距離と時間を計算
   const segments: RouteSegment[] = []
@@ -407,8 +408,8 @@ export async function generateOptimizedClosedRoute(
   console.log(`   Distance: ${routeInfo.totalDistance.toFixed(2)}km`)
   console.log(`   Estimated time: ${routeInfo.estimatedTime.toFixed(1)}min`)
 
-  // 全体ルートの詳細パスを取得
-  const closedWaypoints = [...optimalWaypoints, startLocation]
+  // 全体ルートの詳細パスを取得（スタートを先頭に入れて閉じた配列を作る）
+  const closedWaypoints = [startLocation, ...optimalWaypoints, startLocation]
   let routePath: Location[] = []
 
   try {
