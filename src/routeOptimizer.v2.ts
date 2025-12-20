@@ -339,6 +339,7 @@ export async function evaluateRoute(
 
 /**
  * 走行時間制約の下で、最大距離になるようなウェイポイント数を見つける
+ * 改善版：直線距離推定を使用して高速化
  */
 async function optimizeWaypointCount(
   startLocation: Location,
@@ -352,65 +353,20 @@ async function optimizeWaypointCount(
     segments: RouteSegment[]
   }
 }> {
-  // バイナリサーチで最適なウェイポイント数を探索
-  let minWaypoints = 2 // 最少：スタート直後に折り返す最小構成
-  let maxWaypoints = Math.min(initialWaypoints + 5, MAX_WAYPOINTS)
-  let bestWaypoints: Location[] = []
-  let bestDistance = 0
-  let bestRouteInfo = {
-    totalDistance: 0,
-    estimatedTime: 0,
-    segments: [] as RouteSegment[],
-  }
+  // 直線距離で推定（OSRM呼び出しなし）
+  const targetDistance = maxTimeMinutes / RUNNING_PACE_MIN_PER_KM
+  const candidateWaypoints = generateCircularWaypoints(
+    startLocation,
+    targetDistance,
+    initialWaypoints
+  )
 
-  console.log(`⏱️ Optimizing waypoints for ${maxTimeMinutes}min, trying ${minWaypoints}-${maxWaypoints} waypoints...`)
-
-  // 複数のウェイポイント数でルートを試す
-  for (let numWaypoints = minWaypoints; numWaypoints <= maxWaypoints; numWaypoints++) {
-    console.log(`🔄 Trying ${numWaypoints} waypoints...`)
-
-    try {
-      // 目標距離を計算：走行時間（分） ÷ ペース（分/km） = 走行距離（km）
-      const targetDistance = maxTimeMinutes / RUNNING_PACE_MIN_PER_KM
-      const candidateWaypoints = generateCircularWaypoints(
-        startLocation,
-        targetDistance, // 目標走行距離（km）
-        numWaypoints
-      )
-
-      const routeInfo = await evaluateRoute(startLocation, candidateWaypoints)
-
-      console.log(
-        `  ✓ Distance: ${routeInfo.totalDistance.toFixed(2)}km, Time: ${routeInfo.estimatedTime.toFixed(1)}min`
-      )
-
-      // 走行時間が制約以内で、かつ距離が最大のものを選択
-      if (routeInfo.estimatedTime <= maxTimeMinutes + TIME_BUFFER_MIN) {
-        if (routeInfo.totalDistance > bestDistance) {
-          bestWaypoints = candidateWaypoints
-          bestDistance = routeInfo.totalDistance
-          bestRouteInfo = routeInfo
-          console.log(`  ✅ New best: ${routeInfo.totalDistance.toFixed(2)}km in ${routeInfo.estimatedTime.toFixed(1)}min`)
-        }
-      } else {
-        // 時間超過の場合、この先のウェイポイント数は試さない
-        console.log(`  ⏱️ Exceeds time limit (${routeInfo.estimatedTime.toFixed(1)} > ${maxTimeMinutes})`)
-        break
-      }
-    } catch (error) {
-      console.error(`  ❌ Error with ${numWaypoints} waypoints:`, error)
-      continue
-    }
-  }
-
-  if (bestWaypoints.length === 0) {
-    console.error(`❌ Failed to generate route within ${maxTimeMinutes}min`)
-    throw new Error(`Failed to generate route within ${maxTimeMinutes} minutes`)
-  }
+  // OSRM APIで実際のルート情報を取得（1回だけ）
+  const routeInfo = await evaluateRoute(startLocation, candidateWaypoints)
 
   return {
-    optimalWaypoints: bestWaypoints,
-    routeInfo: bestRouteInfo,
+    optimalWaypoints: candidateWaypoints,
+    routeInfo,
   }
 }
 
@@ -491,20 +447,20 @@ export async function generateOptimizedClosedRoute(
 
   const candidates: RouteCandidate[] = []
 
-  // ✨ v2.2: 複数候補比較版が有効です
+  // ✨ シンプル版：直線距離推定で高速化
   // スケール係数とウェイポイント数の組み合わせで複数候補を生成
-  const scales = [0.8, 0.85, 0.9, 0.95, 1.0]
-  const waypointCounts = [4, 5, 6, 7, 8]
+  const scales = [0.8, 0.9, 1.0]
+  const waypointCounts = [5, 6, 7]
   
   let candidateIndex = 0
   
-  console.log(`\n📋 Generating ${scales.length * waypointCounts.length} route candidates...`)
+  console.log(`\n📋 Generating ${scales.length * waypointCounts.length} route candidates (fast mode)...`)
   
   for (const scale of scales) {
     for (const wpCount of waypointCounts) {
       candidateIndex++
       try {
-        console.log(`   [${candidateIndex}] Scale: ${scale.toFixed(2)}, Waypoints: ${wpCount}...`)
+        console.log(`   [${candidateIndex}/${scales.length * waypointCounts.length}] Scale: ${scale.toFixed(2)}, Waypoints: ${wpCount}`)
         
         const targetTime = maxRunningMinutes * scale
         const { optimalWaypoints: waypoints, routeInfo: info } = await optimizeWaypointCount(
@@ -517,7 +473,7 @@ export async function generateOptimizedClosedRoute(
         
         // 時間制約チェック
         if (estimatedDurationSeconds > maxDurationSeconds) {
-          console.log(`      ⏭️  Skipped: Time exceeded (${estimatedDurationSeconds.toFixed(0)}s > ${maxDurationSeconds}s)`)
+          console.log(`      ⏭️  Skipped: Time exceeded`)
           continue
         }
 
@@ -527,15 +483,14 @@ export async function generateOptimizedClosedRoute(
         try {
           duplicateRatio = calculateDuplicateRatio(closedWaypoints)
         } catch (error) {
-          console.warn(`      ⚠️  Could not calculate duplicate ratio:`, error)
-          duplicateRatio = 0.5 // デフォルト値
+          console.warn(`      ⚠️  Could not calculate duplicate ratio`)
+          duplicateRatio = 0.5
         }
 
         // スコア計算：時間差（70%）＋重複率（30%）
-        // 目標時間との差分（秒）を時間差スコアに変換
         const timeDiffSeconds = Math.abs(maxDurationSeconds - estimatedDurationSeconds)
-        const timeScore = (timeDiffSeconds / maxDurationSeconds) * 0.7 // 0～0.7
-        const duplicateScore = duplicateRatio * 100 * 0.3 // 0～30
+        const timeScore = (timeDiffSeconds / maxDurationSeconds) * 0.7
+        const duplicateScore = duplicateRatio * 100 * 0.3
         const score = timeScore + duplicateScore
         
         const candidate: RouteCandidate = {
@@ -550,12 +505,11 @@ export async function generateOptimizedClosedRoute(
         candidates.push(candidate)
         
         console.log(
-          `      ✅ Time: ${info.estimatedTime.toFixed(1)}min, Distance: ${info.totalDistance.toFixed(2)}km, ` +
-          `Duplicate: ${(duplicateRatio * 100).toFixed(1)}%, Score: ${score.toFixed(2)}`
+          `      ✅ ${info.estimatedTime.toFixed(1)}min, ${info.totalDistance.toFixed(1)}km`
         )
         
       } catch (error) {
-        console.log(`      ❌ Failed: ${error instanceof Error ? error.message : String(error)}`)
+        console.log(`      ❌ Failed`)
       }
     }
   }
