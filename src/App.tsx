@@ -165,7 +165,7 @@ export default function App() {
   }
 
   /**
-   * 住所から位置情報を検索して設定
+   * 住所から位置情報を検索して設定・地図を移動
    */
   const handleSetLocationFromAddress = async (e: any) => {
     e.preventDefault()
@@ -179,12 +179,35 @@ export default function App() {
     try {
       setIsGeocodingLoading(true)
       const newLocation = await geocodeAddress(manualAddress)
+      
+      // 位置情報を更新
       setLocation(newLocation)
+      console.log(`✓ Location set from address: ${newLocation.lat.toFixed(4)}, ${newLocation.lng.toFixed(4)}`)
+      
+      // Geolonia 地図を移動
+      if (window.geolonia) {
+        const maps = window.geolonia.maps
+        if (maps && maps.length > 0) {
+          const map = maps[0]
+          // Geolonia の地図を移動（flyTo でアニメーション付き移動）
+          if (map.flyTo) {
+            map.flyTo({
+              center: [newLocation.lng, newLocation.lat],
+              zoom: 14
+            })
+          } else if (map.setCenter) {
+            // フォールバック
+            map.setCenter([newLocation.lng, newLocation.lat])
+          }
+          console.log(`📍 Map moved to: ${newLocation.lat.toFixed(4)}, ${newLocation.lng.toFixed(4)}`)
+        }
+      }
+      
+      // フォーム入力をクリア
       setManualAddress('')
       setLocationError('')
-      console.log(`✓ Location set from address: ${newLocation.lat.toFixed(4)}, ${newLocation.lng.toFixed(4)}`)
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : '住所の検索に失敗しました'
+      const errorMsg = err instanceof Error ? err.message : '住所の検索に失敗しました。別の住所を試してください。'
       setError(errorMsg)
       console.error('Geocoding error:', err)
     } finally {
@@ -527,6 +550,10 @@ declare global {
   interface Window {
     geolonia?: {
       onReady(callback: () => void): void
+      maps?: Array<{
+        flyTo?(options: { center: [number, number]; zoom: number }): void
+        setCenter?(lnglat: [number, number]): void
+      }>
     }
   }
 }
