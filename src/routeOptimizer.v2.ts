@@ -203,14 +203,26 @@ export async function getClosedRouteGeometry(waypoints: Location[]): Promise<{
       lng,
     }))
 
+    console.log(`✓ OSRM returned route: ${distance.toFixed(2)}km, ${path.length} path points`)
+
     return {
       distance,
       duration,
       path,
     }
   } catch (error) {
-    console.error('OSRM getClosedRouteGeometry error:', error)
-    throw error
+    console.error('⚠️ OSRM getClosedRouteGeometry error:', error)
+    // フォールバック：ウェイポイント間を直線で結ぶ
+    console.log('  Using fallback: waypoints as path')
+    let totalDistance = 0
+    for (let i = 0; i < limitedWaypoints.length - 1; i++) {
+      totalDistance += calculateStraightLineDistance(limitedWaypoints[i], limitedWaypoints[i + 1])
+    }
+    return {
+      distance: totalDistance,
+      duration: totalDistance * RUNNING_PACE_MIN_PER_KM * 60, // 分 → 秒
+      path: limitedWaypoints,
+    }
   }
 }
 
@@ -327,6 +339,8 @@ async function optimizeWaypointCount(
     segments: [] as RouteSegment[],
   }
 
+  console.log(`⏱️ Optimizing waypoints for ${maxTimeMinutes}min, trying ${minWaypoints}-${maxWaypoints} waypoints...`)
+
   // 複数のウェイポイント数でルートを試す
   for (let numWaypoints = minWaypoints; numWaypoints <= maxWaypoints; numWaypoints++) {
     console.log(`🔄 Trying ${numWaypoints} waypoints...`)
@@ -341,15 +355,16 @@ async function optimizeWaypointCount(
       const routeInfo = await evaluateRoute(startLocation, candidateWaypoints)
 
       console.log(
-        `  Distance: ${routeInfo.totalDistance.toFixed(2)}km, Time: ${routeInfo.estimatedTime.toFixed(1)}min`
+        `  ✓ Distance: ${routeInfo.totalDistance.toFixed(2)}km, Time: ${routeInfo.estimatedTime.toFixed(1)}min`
       )
 
       // 走行時間が制約以内で、かつ距離が最大のものを選択
-      if (routeInfo.estimatedTime <= maxTimeMinutes) {
+      if (routeInfo.estimatedTime <= maxTimeMinutes + TIME_BUFFER_MIN) {
         if (routeInfo.totalDistance > bestDistance) {
           bestWaypoints = candidateWaypoints
           bestDistance = routeInfo.totalDistance
           bestRouteInfo = routeInfo
+          console.log(`  ✅ New best: ${routeInfo.totalDistance.toFixed(2)}km in ${routeInfo.estimatedTime.toFixed(1)}min`)
         }
       } else {
         // 時間超過の場合、この先のウェイポイント数は試さない
@@ -357,12 +372,13 @@ async function optimizeWaypointCount(
         break
       }
     } catch (error) {
-      console.error(`  Error with ${numWaypoints} waypoints:`, error)
+      console.error(`  ❌ Error with ${numWaypoints} waypoints:`, error)
       continue
     }
   }
 
   if (bestWaypoints.length === 0) {
+    console.error(`❌ Failed to generate route within ${maxTimeMinutes}min`)
     throw new Error(`Failed to generate route within ${maxTimeMinutes} minutes`)
   }
 
