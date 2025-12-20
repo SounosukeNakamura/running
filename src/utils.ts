@@ -163,37 +163,60 @@ export async function fetchWeatherData(
 }
 
 /**
- * Geolonia Reverse Geocoding APIで緯度経度から住所を取得
+ * OpenStreetMap Nominatim APIで緯度経度から住所を取得
  * @param location 緯度・経度
  * @returns 住所文字列
  */
 export async function reverseGeocodeLocation(location: Location): Promise<string> {
-  const url = new URL('https://api.geolonia.com/v1/reverse')
+  const url = new URL('https://nominatim.openstreetmap.org/reverse')
   url.searchParams.set('lat', location.lat.toString())
-  url.searchParams.set('lng', location.lng.toString())
+  url.searchParams.set('lon', location.lng.toString())
+  url.searchParams.set('format', 'json')
+  url.searchParams.set('accept-language', 'ja')
 
   try {
+    console.log(`🔄 Reverse geocoding: ${location.lat}, ${location.lng}`)
     const response = await fetch(url.toString())
     if (!response.ok) {
-      throw new Error(`Reverse Geocoding API error: ${response.status}`)
+      throw new Error(`Nominatim API error: ${response.status}`)
     }
 
     const data = await response.json()
-    console.log('Reverse geocoding response:', data)
+    console.log('Nominatim response:', data)
 
-    // Geolonia APIの応答形式: { properties: { name } }
-    if (data.properties && data.properties.name) {
-      console.log('✓ Address found:', data.properties.name)
-      return data.properties.name
+    // Nominatim APIの応答形式: { address: { ... } } または { name: '...' }
+    if (data.address) {
+      // 住所コンポーネントから適切な住所を組み立てる
+      const addr = data.address
+      const parts = []
+      
+      // 都道府県
+      if (addr.state) parts.push(addr.state)
+      // 市区町村
+      if (addr.city) parts.push(addr.city)
+      else if (addr.town) parts.push(addr.town)
+      // 町名・番地
+      if (addr.suburb) parts.push(addr.suburb)
+      else if (addr.village) parts.push(addr.village)
+
+      const address = parts.join('')
+      if (address) {
+        console.log(`✓ Address found: ${address}`)
+        return address
+      }
     }
 
-    // フォールバック：座標表示
-    console.warn('No address name in response, falling back to coordinates')
-    return `${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}`
+    // フォールバック：display_name を使用
+    if (data.display_name) {
+      console.log(`✓ Using display_name: ${data.display_name}`)
+      return data.display_name
+    }
+
+    console.warn('No address found in Nominatim response')
+    return '住所を取得できませんでした'
   } catch (error) {
     console.error('⚠️ Reverse geocoding error:', error)
-    // エラー時は座標を返す
-    return `${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}`
+    return '住所を取得できませんでした'
   }
 }
 

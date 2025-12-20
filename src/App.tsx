@@ -342,13 +342,8 @@ export default function App() {
               <div className="location-display">
                 <p>
                   <strong>現在地：</strong>
-                  {locationAddress || `${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}`}
+                  {locationAddress}
                 </p>
-                {locationAddress && locationAddress !== `${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}` && (
-                  <p style={{ fontSize: '0.9em', color: '#666', marginTop: '0.5em' }}>
-                    （緯度 {location.lat.toFixed(4)}, 経度 {location.lng.toFixed(4)}）
-                  </p>
-                )}
               </div>
 
               {locationError && (
