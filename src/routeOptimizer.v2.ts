@@ -295,7 +295,7 @@ export async function getSegmentRouteInfo(
 /**
  * ウェイポイント経由の全体ルートを評価（走行時間を計算）
  */
-async function evaluateRoute(
+export async function evaluateRoute(
   startLocation: Location,
   waypoints: Location[]
 ): Promise<{
@@ -450,16 +450,59 @@ function calculateDuplicateRatio(routePath: Location[]): number {
   return Math.min(ratio, 1.0)
 }
 
-// ===== メイン最適化関数（複数候補比較版）
+// ===== 重複度計算関数 =====
+
+/**
+ * ルートパス内での重複度を計算
+ * @param routePath ルート上の座標列
+ * @returns 重複度（0-1、低いほど重複が少ない）
+ */
+export function calculateDuplicateRatio(routePath: Location[]): number {
+  if (routePath.length < 4) return 0
+
+  // ルートを前半と後半に分割
+  const midPoint = Math.floor(routePath.length / 2)
+  const firstHalf = routePath.slice(0, midPoint)
+  const secondHalf = routePath.slice(midPoint)
+
+  if (firstHalf.length === 0 || secondHalf.length === 0) return 0
+
+  let duplicateCount = 0
+
+  // 前半の各点について、後半で近い点があるかチェック
+  for (const point1 of firstHalf) {
+    for (const point2 of secondHalf) {
+      const distance = calculateStraightLineDistance(point1, point2)
+      if (distance * 1000 <= 20) { // 20m以内
+        duplicateCount++
+        break
+      }
+    }
+  }
+
+  const ratio = duplicateCount / firstHalf.length
+  return Math.min(ratio, 1.0)
+}
+
+// ===== メイン最適化関数（複数候補比較版） =====
+
+interface RouteCandidate {
+  waypoints: Location[]
+  routeInfo: { totalDistance: number; estimatedTime: number; segments: RouteSegment[] }
+  duplicateRatio: number
+  score: number
+}
 
 /**
  * ランニング時間から最適化された周回ルートを生成
  * 
  * 特徴：
+ * - 複数候補生成：スケール係数（0.8～1.0）とウェイポイント数（4～8）を組み合わせ
+ * - 重複評価：同じ道を走る度合い（duplicateRatio）を計算
+ * - スマート選択：時間ペナルティ（70%）と重複ペナルティ（30%）で最良ルート選定
  * - スタート = ゴール地点
  * - 全区間が OSRM で道路ネットワークに沿う
  * - 走行時間が入力値を超えない（最大許容値以下に調整）
- * - 指定時間内で最大距離を実現
  */
 export async function generateOptimizedClosedRoute(
   startLocation: Location,
@@ -471,72 +514,110 @@ export async function generateOptimizedClosedRoute(
   }
 
   console.log(
-    `\n🚀 Starting closed route generation (${maxRunningMinutes} min, ${startLocation.lat.toFixed(4)}, ${startLocation.lng.toFixed(4)})`
+    `\n🚀 Starting closed route generation - Multi-candidate (${maxRunningMinutes} min, ${startLocation.lat.toFixed(4)}, ${startLocation.lng.toFixed(4)})`
   )
 
   // 最大許容時間（秒）：丸め誤差を避けるため5秒のマージンを持つ
   const maxDurationSeconds = maxRunningMinutes * 60 - 5
   console.log(`⏱️ Max duration: ${maxDurationSeconds}s (${maxRunningMinutes}min - 5s buffer)`)
 
-  // スケール係数を使った段階的な再試行
-  const MAX_RETRY = 10
-  let scale = 1.0
-  let routeInfo: { totalDistance: number; estimatedTime: number; segments: RouteSegment[] } | null = null
-  let optimalWaypoints: Location[] = []
+  const candidates: RouteCandidate[] = []
 
-  for (let attempt = 0; attempt < MAX_RETRY; attempt++) {
-    console.log(`\n🔄 Attempt ${attempt + 1}/${MAX_RETRY} (scale: ${scale.toFixed(2)})`)
+  // スケール係数とウェイポイント数の組み合わせで複数候補を生成
+  const scales = [0.8, 0.85, 0.9, 0.95, 1.0]
+  const waypointCounts = [4, 5, 6, 7, 8]
+  
+  let candidateIndex = 0
+  
+  console.log(`\n📋 Generating ${scales.length * waypointCounts.length} route candidates...`)
+  
+  for (const scale of scales) {
+    for (const wpCount of waypointCounts) {
+      candidateIndex++
+      try {
+        console.log(`   [${candidateIndex}] Scale: ${scale.toFixed(2)}, Waypoints: ${wpCount}...`)
+        
+        const targetTime = maxRunningMinutes * scale
+        const { optimalWaypoints: waypoints, routeInfo: info } = await optimizeWaypointCount(
+          startLocation,
+          targetTime,
+          wpCount
+        )
 
-    try {
-      // ウェイポイント数を最適化（スケール係数を適用）
-      const { optimalWaypoints: waypoints, routeInfo: info } = await optimizeWaypointCount(
-        startLocation,
-        maxRunningMinutes * scale,
-        initialWaypointCount
-      )
+        const estimatedDurationSeconds = info.estimatedTime * 60
+        
+        // 時間制約チェック
+        if (estimatedDurationSeconds > maxDurationSeconds) {
+          console.log(`      ⏭️  Skipped: Time exceeded (${estimatedDurationSeconds.toFixed(0)}s > ${maxDurationSeconds}s)`)
+          continue
+        }
 
-      optimalWaypoints = waypoints
-      routeInfo = info
+        // 重複率を計算
+        const closedWaypoints = [startLocation, ...waypoints, startLocation]
+        let duplicateRatio = 0
+        try {
+          duplicateRatio = calculateDuplicateRatio(closedWaypoints)
+        } catch (error) {
+          console.warn(`      ⚠️  Could not calculate duplicate ratio:`, error)
+          duplicateRatio = 0.5 // デフォルト値
+        }
 
-      console.log(`   Distance: ${routeInfo.totalDistance.toFixed(2)}km, Time: ${routeInfo.estimatedTime.toFixed(1)}min`)
-
-      // 推定時間が制限以内か確認
-      const estimatedDurationSeconds = routeInfo.estimatedTime * 60
-      if (estimatedDurationSeconds <= maxDurationSeconds) {
-        console.log(`   ✅ Time OK: ${estimatedDurationSeconds.toFixed(0)}s <= ${maxDurationSeconds}s`)
-        break
-      } else {
-        console.log(`   ⚠️ Time exceeded: ${estimatedDurationSeconds.toFixed(0)}s > ${maxDurationSeconds}s`)
-        // スケールを縮小して再試行
-        scale *= 0.90
+        // スコア計算：時間差（70%）＋重複率（30%）
+        // 目標時間との差分（秒）を時間差スコアに変換
+        const timeDiffSeconds = Math.abs(maxDurationSeconds - estimatedDurationSeconds)
+        const timeScore = (timeDiffSeconds / maxDurationSeconds) * 0.7 // 0～0.7
+        const duplicateScore = duplicateRatio * 100 * 0.3 // 0～30
+        const score = timeScore + duplicateScore
+        
+        const candidate: RouteCandidate = {
+          waypoints,
+          routeInfo: info,
+          duplicateRatio,
+          score
+        }
+        
+        candidates.push(candidate)
+        
+        console.log(
+          `      ✅ Time: ${info.estimatedTime.toFixed(1)}min, Distance: ${info.totalDistance.toFixed(2)}km, ` +
+          `Duplicate: ${(duplicateRatio * 100).toFixed(1)}%, Score: ${score.toFixed(2)}`
+        )
+        
+      } catch (error) {
+        console.log(`      ❌ Failed: ${error instanceof Error ? error.message : String(error)}`)
       }
-    } catch (error) {
-      console.error(`   ❌ Error in attempt ${attempt + 1}:`, error)
-      // エラーが出た場合もスケールを縮小して再試行
-      scale *= 0.90
     }
   }
 
-  // 最終チェック
-  if (!routeInfo || !optimalWaypoints.length) {
-    throw new Error(`Failed to generate route within ${maxRunningMinutes} minutes. Try increasing the time or retry.`)
-  }
-
-  const finalDurationSeconds = routeInfo.estimatedTime * 60
-  if (finalDurationSeconds > maxDurationSeconds) {
-    console.error(
-      `❌ Final time check failed: ${finalDurationSeconds.toFixed(0)}s > ${maxDurationSeconds}s`
-    )
+  // 候補がない場合はエラー
+  if (candidates.length === 0) {
     throw new Error(
       `指定時間内に収まるルートを生成できませんでした。時間を増やすか再試行してください。`
     )
   }
 
+  // スコアでソート（低いほど良い）し、最良候補を選択
+  candidates.sort((a, b) => a.score - b.score)
+  
+  console.log(`\n📊 Generated ${candidates.length} valid candidates`)
+  console.log(`🏆 Top 3 candidates:`)
+  candidates.slice(0, 3).forEach((c, i) => {
+    console.log(
+      `   [${i + 1}] Score: ${c.score.toFixed(2)}, Time: ${c.routeInfo.estimatedTime.toFixed(1)}min, ` +
+      `Distance: ${c.routeInfo.totalDistance.toFixed(2)}km, Duplicate: ${(c.duplicateRatio * 100).toFixed(1)}%`
+    )
+  })
+
+  const bestCandidate = candidates[0]
+  const routeInfo = bestCandidate.routeInfo
+  const optimalWaypoints = bestCandidate.waypoints
+
   console.log(`\n✅ Route generation succeeded:`)
   console.log(`   Waypoints: ${optimalWaypoints.length}`)
   console.log(`   Distance: ${routeInfo.totalDistance.toFixed(2)}km`)
-  console.log(`   Estimated time: ${routeInfo.estimatedTime.toFixed(1)}min (${finalDurationSeconds.toFixed(0)}s)`)
-  console.log(`   Max allowed: ${maxRunningMinutes}min (${maxDurationSeconds}s)`)
+  console.log(`   Estimated time: ${routeInfo.estimatedTime.toFixed(1)}min`)
+  console.log(`   Duplicate ratio: ${(bestCandidate.duplicateRatio * 100).toFixed(1)}%`)
+  console.log(`   Score: ${bestCandidate.score.toFixed(2)}`)
 
   // 全体ルートの詳細パスを取得（スタートを先頭に入れて閉じた配列を作る）
   const closedWaypoints = [startLocation, ...optimalWaypoints, startLocation]
