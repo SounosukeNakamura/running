@@ -384,31 +384,6 @@ export default function App() {
               />
             </>
           ) : null}
-
-          {/* 手動位置情報入力 */}
-          <div className="manual-location">
-            <h3>住所から位置情報を検索</h3>
-            <form onSubmit={handleSetLocationFromAddress} className="form-inline">
-              <div className="form-group">
-                <label htmlFor="manual-address">住所:</label>
-                <input
-                  id="manual-address"
-                  type="text"
-                  placeholder="例：東京都渋谷区"
-                  value={manualAddress}
-                  onChange={(e) => setManualAddress(e.target.value)}
-                  disabled={isGeocodingLoading}
-                />
-              </div>
-              <button 
-                type="submit" 
-                className="btn btn-secondary"
-                disabled={isGeocodingLoading}
-              >
-                {isGeocodingLoading ? '検索中...' : '検索'}
-              </button>
-            </form>
-          </div>
         </section>
 
         {/* コース生成セクション */}
