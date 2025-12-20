@@ -523,6 +523,7 @@ export async function generateOptimizedClosedRoute(
 
   const candidates: RouteCandidate[] = []
 
+  // ✨ v2.2: 複数候補比較版が有効です
   // スケール係数とウェイポイント数の組み合わせで複数候補を生成
   const scales = [0.8, 0.85, 0.9, 0.95, 1.0]
   const waypointCounts = [4, 5, 6, 7, 8]
