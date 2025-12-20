@@ -141,12 +141,35 @@ export function generateCircularCourse(
 // ===== API呼び出し関数 =====
 
 /**
- * OpenWeather APIから天気情報を取得
+ * OpenWeather API から天気情報を取得
+ * 
+ * 使用方法：
+ *   const apiKey = import.meta.env.VITE_OPENWEATHER_API_KEY
+ *   const weatherData = await fetchWeatherData(location, apiKey)
+ * 
+ * APIキー取得：
+ *   https://openweathermap.org/api
+ * 
+ * 環境変数設定：
+ *   .env.local (ローカル開発):
+ *     VITE_OPENWEATHER_API_KEY=xxxxxxxxxxxxxxxxxxxx
+ *   
+ *   Vercel (本番環境):
+ *     https://vercel.com/settings/environment-variables
+ * 
+ * @param location 位置情報（緯度経度）
+ * @param apiKey OpenWeather API キー
+ * @returns 天気データ
+ * @throws APIエラーの場合、Error をスロー
  */
 export async function fetchWeatherData(
   location: Location,
   apiKey: string
 ): Promise<WeatherData> {
+  if (!apiKey || apiKey.trim() === '') {
+    throw new Error('OpenWeather API キーが設定されていません。.env ファイルを確認してください。')
+  }
+
   const url = new URL('https://api.openweathermap.org/data/2.5/weather')
   url.searchParams.set('lat', location.lat.toString())
   url.searchParams.set('lon', location.lng.toString())
@@ -154,12 +177,19 @@ export async function fetchWeatherData(
   url.searchParams.set('units', 'metric')
   url.searchParams.set('lang', 'ja')
 
-  const response = await fetch(url.toString())
-  if (!response.ok) {
-    throw new Error(`Weather API error: ${response.status} ${response.statusText}`)
+  try {
+    const response = await fetch(url.toString())
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('OpenWeather APIキーが無効です。Vercelの環境変数を確認してください。')
+      }
+      throw new Error(`Weather API error: ${response.status} ${response.statusText}`)
+    }
+    return response.json()
+  } catch (error) {
+    console.error('❌ OpenWeather API エラー:', error)
+    throw error
   }
-
-  return response.json()
 }
 
 /**

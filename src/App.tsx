@@ -274,23 +274,28 @@ export default function App() {
 
   /**
    * 位置情報に基づいて天気情報を取得
+   * 環境変数 VITE_OPENWEATHER_API_KEY が未設定の場合は警告を表示し処理を中断
    */
   const fetchWeatherForLocation = async (loc: Location) => {
     const apiKey = import.meta.env.VITE_OPENWEATHER_API_KEY
 
-    if (!apiKey) {
-      setWeatherError('OpenWeather API キーが設定されていません。')
+    // APIキーが未設定の場合
+    if (!apiKey || apiKey.trim() === '') {
+      console.warn('⚠️ OpenWeather API キーが未設定です。.env に VITE_OPENWEATHER_API_KEY を設定してください。')
+      setWeatherError('天気情報を表示するにはOpenWeather APIキーを設定してください。詳細は.envファイルを参照してください。')
+      setWeather(null)
       return
     }
 
     try {
       setWeatherLoading(true)
+      setWeatherError('')
       const data = await fetchWeatherData(loc, apiKey)
       setWeather(data)
-      setWeatherError('')
     } catch (err) {
-      setWeatherError('天気情報の取得に失敗しました。')
-      console.error('Weather API Error:', err)
+      console.error('❌ 天気情報取得エラー:', err)
+      setWeatherError('天気情報の取得に失敗しました。APIキーが正しいか確認してください。')
+      setWeather(null)
     } finally {
       setWeatherLoading(false)
     }
