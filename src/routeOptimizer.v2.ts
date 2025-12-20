@@ -220,7 +220,7 @@ export async function getClosedRouteGeometry(waypoints: Location[]): Promise<{
     }
     return {
       distance: totalDistance,
-      duration: totalDistance * RUNNING_PACE_MIN_PER_KM * 60, // 分 → 秒
+      duration: totalDistance * RUNNING_PACE_MIN_PER_KM * 60, // km * 分/km * 60秒/分 = 秒
       path: limitedWaypoints,
     }
   }
@@ -346,9 +346,11 @@ async function optimizeWaypointCount(
     console.log(`🔄 Trying ${numWaypoints} waypoints...`)
 
     try {
+      // 目標距離を計算：走行時間（分） ÷ ペース（分/km） = 走行距離（km）
+      const targetDistance = maxTimeMinutes / RUNNING_PACE_MIN_PER_KM
       const candidateWaypoints = generateCircularWaypoints(
         startLocation,
-        (maxTimeMinutes * RUNNING_PACE_MIN_PER_KM) / 1.2, // 初期距離推定
+        targetDistance, // 目標走行距離（km）
         numWaypoints
       )
 
