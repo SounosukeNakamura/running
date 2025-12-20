@@ -265,8 +265,9 @@ export default function App() {
       // 天気情報を取得
       fetchWeatherForLocation(location)
     } catch (err) {
-      setError('コース生成中にエラーが発生しました。')
-      console.error(err)
+      const errorMessage = err instanceof Error ? err.message : 'コース生成中にエラーが発生しました。'
+      setError(errorMessage)
+      console.error('Course generation error:', err)
     } finally {
       setIsGenerating(false)
     }
