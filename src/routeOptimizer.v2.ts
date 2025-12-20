@@ -450,45 +450,13 @@ function calculateDuplicateRatio(routePath: Location[]): number {
   return Math.min(ratio, 1.0)
 }
 
-// ===== 重複度計算関数 =====
-
-/**
- * ルートパス内での重複度を計算
- * @param routePath ルート上の座標列
- * @returns 重複度（0-1、低いほど重複が少ない）
- */
-export function calculateDuplicateRatio(routePath: Location[]): number {
-  if (routePath.length < 4) return 0
-
-  // ルートを前半と後半に分割
-  const midPoint = Math.floor(routePath.length / 2)
-  const firstHalf = routePath.slice(0, midPoint)
-  const secondHalf = routePath.slice(midPoint)
-
-  if (firstHalf.length === 0 || secondHalf.length === 0) return 0
-
-  let duplicateCount = 0
-
-  // 前半の各点について、後半で近い点があるかチェック
-  for (const point1 of firstHalf) {
-    for (const point2 of secondHalf) {
-      const distance = calculateStraightLineDistance(point1, point2)
-      if (distance * 1000 <= 20) { // 20m以内
-        duplicateCount++
-        break
-      }
-    }
-  }
-
-  const ratio = duplicateCount / firstHalf.length
-  return Math.min(ratio, 1.0)
-}
-
 // ===== メイン最適化関数（複数候補比較版） =====
 
 interface RouteCandidate {
   waypoints: Location[]
   routeInfo: { totalDistance: number; estimatedTime: number; segments: RouteSegment[] }
+  routePath: Location[]
+  duration: number
   duplicateRatio: number
   score: number
 }
@@ -573,6 +541,8 @@ export async function generateOptimizedClosedRoute(
         const candidate: RouteCandidate = {
           waypoints,
           routeInfo: info,
+          routePath: closedWaypoints,
+          duration: estimatedDurationSeconds,
           duplicateRatio,
           score
         }
