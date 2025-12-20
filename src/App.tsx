@@ -421,10 +421,6 @@ export default function App() {
                 <span className="label">走行距離:</span>
                 <span className="value">{courseDistance.toFixed(2)} km</span>
               </div>
-              <div className="info-item">
-                <span className="label">ウェイポイント数:</span>
-                <span className="value">{course.length} 地点</span>
-              </div>
               {optimizedRoute && (
                 <div className="info-item">
                   <span className="label">推定走行時間:</span>
@@ -432,33 +428,6 @@ export default function App() {
                 </div>
               )}
             </div>
-
-            {/* ルート最適化情報 */}
-            {optimizedRoute && (
-              <div className="optimization-info">
-                <h3>📊 ルート最適化情報</h3>
-                <ul>
-                  <li>✅ OSRMによる道路ネットワークベースのルート生成</li>
-                  <li>✅ スタート地点 = ゴール地点（現在地）の周回ルート</li>
-                  <li>✅ 指定距離への自動調整（{optimizedRoute.totalDistance.toFixed(2)}km）</li>
-                  <li>✅ {optimizedRoute.waypoints.length}個のウェイポイントを内部で使用</li>
-                  <li>✅ {optimizedRoute.segments.length}区間を経由（全区間が道路に沿います）</li>
-                  <li>✅ 実際の道路に沿ったナビゲーション対応</li>
-                </ul>
-              </div>
-            )}
-
-            {/* コースの詳細情報 */}
-            <details>
-              <summary>コースの詳細座標（{course.length}個のウェイポイント）</summary>
-              <div className="course-details">
-                {course.map((point, idx) => (
-                  <div key={idx} className="point-info">
-                    <strong>ウェイポイント {idx}:</strong> {point.lat.toFixed(6)}, {point.lng.toFixed(6)}
-                  </div>
-                ))}
-              </div>
-            </details>
           </section>
         )}
 
