@@ -184,9 +184,21 @@ export async function reverseGeocodeLocation(location: Location): Promise<string
     const data = await response.json()
     console.log('Nominatim response:', data)
 
-    // Nominatim APIの応答形式: { address: { ... } } または { name: '...' }
+    // display_name を優先的に使用（日本の場合、都道府県から始まる形式）
+    if (data.display_name) {
+      // 日本の住所の場合、最初の部分（都道府県から市区町村まで）を抽出
+      const parts = data.display_name.split(',').map((p: string) => p.trim())
+      // 最初の3つの部分を使用（都道府県、市区町村、町名など）
+      const address = parts.slice(0, 3).join('')
+      
+      if (address && !address.includes('Japan')) {
+        console.log(`✓ Address found: ${address}`)
+        return address
+      }
+    }
+
+    // 代替案：address コンポーネントから構築
     if (data.address) {
-      // 住所コンポーネントから適切な住所を組み立てる
       const addr = data.address
       const parts = []
       
@@ -195,21 +207,12 @@ export async function reverseGeocodeLocation(location: Location): Promise<string
       // 市区町村
       if (addr.city) parts.push(addr.city)
       else if (addr.town) parts.push(addr.town)
-      // 町名・番地
-      if (addr.suburb) parts.push(addr.suburb)
-      else if (addr.village) parts.push(addr.village)
-
+      
       const address = parts.join('')
       if (address) {
         console.log(`✓ Address found: ${address}`)
         return address
       }
-    }
-
-    // フォールバック：display_name を使用
-    if (data.display_name) {
-      console.log(`✓ Using display_name: ${data.display_name}`)
-      return data.display_name
     }
 
     console.warn('No address found in Nominatim response')
