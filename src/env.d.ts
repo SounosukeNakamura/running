@@ -22,8 +22,8 @@ interface ImportMetaEnv {
   readonly VITE_OPENWEATHER_API_KEY: string
   
   /** ランニング想定ペース（分/km）- オプション */
-
-interface ImportMeta {
+  readonly VITE_RUNNING_PACE_MIN_PER_KM?: string
+}
   readonly env: ImportMetaEnv
 }
 
