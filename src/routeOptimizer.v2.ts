@@ -512,11 +512,16 @@ interface RouteCandidate {
 /**
  * ランニング時間から最適化された周回ルートを生成（改善版）
  * 
+ * 時間条件：
+ *   lowerBound = minutes - 2
+ *   targetMin = minutes
+ *   条件: lowerBound < estimatedMinutes < targetMin
+ *   つまり: minutes - 2 < estimatedMinutes < minutes
+ * 
  * 改善点：
- * 1. 時間精度を1分以内に（複数試行で自動調整）
- * 2. ルート品質を評価（ターン数、ジグザグ度、重複度）
- * 3. 優先順位：時間精度 > ターン数 > 重複度
- * 4. 最大試行30回で条件を満たすルートを検索
+ * 1. 厳密な時間条件を満たすルートのみ採用
+ * 2. 最大試行30回で条件を満たすルートを検索
+ * 3. 優先順位：時間の近さ > 重複度 > ターン数
  */
 export async function generateOptimizedClosedRoute(
   startLocation: Location,
@@ -531,16 +536,21 @@ export async function generateOptimizedClosedRoute(
     `\n🚀 Starting route generation (${maxRunningMinutes} min, ${startLocation.lat.toFixed(4)}, ${startLocation.lng.toFixed(4)})`
   )
 
-  const targetDurationSeconds = maxRunningMinutes * 60
+  // ⏰ 時間条件を定義
+  const targetMin = maxRunningMinutes
+  const lowerBound = maxRunningMinutes - 2
+  
+  console.log(`⏰ Time condition: ${lowerBound.toFixed(1)}min < estimatedTime < ${targetMin}min`)
+
   const candidates: RouteCandidate[] = []
   const maxAttempts = 30
   let attemptCount = 0
 
-  // ✨ 改善版：時間精度が1分以内になるまで試行
-  const scales = [0.8, 0.85, 0.9, 0.95, 1.0]
+  // スケール係数とウェイポイント数を拡大（候補を多く生成）
+  const scales = [0.75, 0.8, 0.85, 0.9, 0.95, 1.0]
   const waypointCounts = [4, 5, 6, 7, 8]
   
-  console.log(`\n📋 Attempting to generate route candidates (max ${maxAttempts} attempts)...`)
+  console.log(`\n📋 Generating route candidates (max ${maxAttempts} attempts)...`)
   
   for (const scale of scales) {
     if (attemptCount >= maxAttempts) break
@@ -559,13 +569,16 @@ export async function generateOptimizedClosedRoute(
           wpCount
         )
 
-        const estimatedDurationSeconds = info.estimatedTime * 60
-        const timeDiffSeconds = estimatedDurationSeconds - targetDurationSeconds
+        const estimatedMinutes = info.estimatedTime
         
-        // 🔴 時間オーバーしていたらスキップ（絶対にプラスにならないようにする）
-        if (timeDiffSeconds > 0) {
+        // 🔴 厳密な時間条件チェック：lowerBound < estimatedMinutes < targetMin
+        if (!(lowerBound < estimatedMinutes && estimatedMinutes < targetMin)) {
+          const reason = 
+            estimatedMinutes <= lowerBound ? `too short (${estimatedMinutes.toFixed(1)}min ≤ ${lowerBound.toFixed(1)}min)` :
+            estimatedMinutes >= targetMin ? `exceeds target (${estimatedMinutes.toFixed(1)}min ≥ ${targetMin}min)` :
+            'unknown'
           console.log(
-            `      ⏭️  Skipped: Time exceeds target (${info.estimatedTime.toFixed(1)}min > ${maxRunningMinutes}min)`
+            `      ⏭️  Skipped: ${reason}`
           )
           continue
         }
@@ -586,20 +599,27 @@ export async function generateOptimizedClosedRoute(
         const qualityScore = calculateRouteQualityScore(routePath)
         const sharpTurns = countSharpTurns(routePath, 60)
 
-        // スコア計算（優先度：時間差 > ターン数 > 重複度）
-        // 時間が短いほど良い（負の値。絶対値が小さいほど高評価）
-        const absTimeDiffMinutes = Math.abs(timeDiffSeconds) / 60
-        const timeScore = absTimeDiffMinutes * 100 // 時間が短いほど低スコア
-        const qualityPenalty = qualityScore * 10 // 0-10
-        const duplicatePenalty = duplicateRatio * 5 // 0-5
+        // スコア計算（優先度：1時間の近さ > 2重複度 > 3ターン数）
+        // 1. targetMin - estimatedMinutes が最小（走りたい時間に最も近い）
+        //    差が小さいほどスコアが低い（良い）
+        const timeDistanceToTarget = targetMin - estimatedMinutes
+        const timeScore = timeDistanceToTarget * 1000 // スケーリング
         
-        const score = timeScore + qualityPenalty * 10 + duplicatePenalty
+        // 2. 重複度が低い
+        const duplicatePenalty = duplicateRatio * 100 // 0-100
+        
+        // 3. ターン数が少ない
+        const turnPenalty = sharpTurns * 5 // 1ターンあたり5ポイント
+        
+        const score = timeScore + duplicatePenalty + turnPenalty
 
+        const timeDiffSeconds = (estimatedMinutes - targetMin) * 60 // 負の値（オーバーしてない）
+        
         const candidate: RouteCandidate = {
           waypoints,
           routeInfo: info,
           routePath,
-          duration: estimatedDurationSeconds,
+          duration: estimatedMinutes * 60, // 秒に変換
           timeDiff: timeDiffSeconds,
           duplicateRatio,
           qualityScore,
@@ -609,11 +629,9 @@ export async function generateOptimizedClosedRoute(
         
         candidates.push(candidate)
         
-        const withinTarget = absTimeDiffMinutes <= 1
-        const marker = withinTarget ? '🎯' : '⏱️'
         console.log(
-          `      ${marker} Time: ${info.estimatedTime.toFixed(1)}min (${timeDiffSeconds < 0 ? '-' : '+'}${absTimeDiffMinutes.toFixed(1)}min), ` +
-          `Quality: ${qualityScore.toFixed(2)}, Turns: ${sharpTurns}`
+          `      ✅ Time: ${estimatedMinutes.toFixed(1)}min (target: ${targetMin}min), ` +
+          `Quality: ${qualityScore.toFixed(2)}, Turns: ${sharpTurns}, Dup: ${(duplicateRatio*100).toFixed(0)}%`
         )
         
       } catch (error) {
@@ -625,39 +643,33 @@ export async function generateOptimizedClosedRoute(
   // 候補がない場合はエラー
   if (candidates.length === 0) {
     throw new Error(
-      `指定時間に合うルートを生成できませんでした。時間を増やすか再試行してください。`
+      `指定した時間に合うルートを生成できませんでした。時間を変更して再試行してください。`
     )
   }
 
-  // ルートを選定
-  // 1. 時間が1分以内に短いものを優先（時間オーバーなし）
-  const accurateCandidates = candidates.filter((c) => Math.abs(c.timeDiff) / 60 <= 1)
-  const candidatesToSort = accurateCandidates.length > 0 ? accurateCandidates : candidates
-
-  // 2. スコアでソート（低いほど良い）
-  candidatesToSort.sort((a, b) => a.score - b.score)
+  // ルートを選定（スコアが最小のものを選ぶ）
+  candidates.sort((a, b) => a.score - b.score)
   
-  console.log(`\n📊 Generated ${candidates.length} candidates (${accurateCandidates.length} within ±1min)`)
+  console.log(`\n📊 Generated ${candidates.length} valid candidates`)
   console.log(`🏆 Top 3 candidates:`)
-  candidatesToSort.slice(0, 3).forEach((c, i) => {
-    const timeDiffMin = (c.timeDiff / 60).toFixed(1)
+  candidates.slice(0, 3).forEach((c, i) => {
     console.log(
-      `   [${i + 1}] Time: ${c.routeInfo.estimatedTime.toFixed(1)}min (${c.timeDiff < 0 ? '-' : '+'}${Math.abs(c.timeDiff) / 60}min), ` +
+      `   [${i + 1}] Time: ${c.routeInfo.estimatedTime.toFixed(1)}min, ` +
       `Distance: ${c.routeInfo.totalDistance.toFixed(2)}km, ` +
-      `Quality: ${c.qualityScore.toFixed(2)}, Turns: ${c.sharpTurns}`
+      `Duplicate: ${(c.duplicateRatio * 100).toFixed(0)}%, Turns: ${c.sharpTurns}`
     )
   })
 
-  const bestCandidate = candidatesToSort[0]
+  const bestCandidate = candidates[0]
   const routeInfo = bestCandidate.routeInfo
   const optimalWaypoints = bestCandidate.waypoints
 
   console.log(`\n✅ Route selected:`)
+  console.log(`   Time: ${routeInfo.estimatedTime.toFixed(1)}min (target: ${targetMin}min, range: ${lowerBound.toFixed(1)}-${targetMin}min)`)
   console.log(`   Distance: ${routeInfo.totalDistance.toFixed(2)}km`)
-  console.log(`   Estimated time: ${routeInfo.estimatedTime.toFixed(1)}min (target: ${maxRunningMinutes}min)`)
-  console.log(`   Time diff: -${Math.abs(bestCandidate.timeDiff / 60).toFixed(1)}min (絶対に時間オーバーなし)`)
   console.log(`   Route quality: ${bestCandidate.qualityScore.toFixed(2)}, Turns: ${bestCandidate.sharpTurns}`)
   console.log(`   Duplicate ratio: ${(bestCandidate.duplicateRatio * 100).toFixed(1)}%`)
+  console.log(`   ✅ Condition satisfied: ${lowerBound.toFixed(1)}min < ${routeInfo.estimatedTime.toFixed(1)}min < ${targetMin}min`)
 
   // ルートパスは既に取得済み
   const routePath = bestCandidate.routePath
