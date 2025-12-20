@@ -1,5 +1,5 @@
 /**
- * 改善版：道路ネットワークベースのルート生成エンジン v2.0
+ * 改善版：道路ネットワークベースのルート生成エンジン v2.1
  * 
  * 改善点：
  * 1. スタート = ゴール地点の厳密な周回ルート
@@ -7,6 +7,8 @@
  * 3. 走行時間制約を厳密に管理（超過しない）
  * 4. マーカー表示制御を UI 層に委譲
  * 5. 指定時間内で最大距離になるように最適化
+ * 6. 複数の周回ルート候補を生成し、重複度が低いルートを優先
+ * 7. 時間が目標値に最も近いルートを選択
  */
 
 export interface Location {
@@ -31,8 +33,21 @@ export interface OptimizedRoute {
   routePath: Location[] // 完全なルートパス（表示用）
   displayMarkers?: {
     startGoal: Location // スタート・ゴール地点のマーカー
-    // ウェイポイント用マーカーは表示しない
   }
+}
+
+// ルート候補の内部評価用
+interface RouteCandidate {
+  waypoints: Location[]
+  routeInfo: {
+    totalDistance: number
+    estimatedTime: number
+    segments: RouteSegment[]
+  }
+  routePath: Location[]
+  duration: number // 秒
+  duplicateRatio: number // 0-1 の重複度（低いほど良い）
+  score: number // 複合スコア（低いほど良い）
 }
 
 // ===== 定数 =====
@@ -48,6 +63,15 @@ const RUNNING_PACE_MIN_PER_KM = 6
 
 /** 直線距離から実道路距離への係数（都市部） */
 const ROUTE_DISTANCE_RATIO = 0.7
+
+/** ルート候補生成の最小数 */
+const MIN_ROUTE_CANDIDATES = 10
+
+/** ルート候補生成の最大数 */
+const MAX_ROUTE_CANDIDATES = 30
+
+/** 重複判定の距離閾値（メートル） */
+const DUPLICATE_THRESHOLD_METERS = 20
 
 /** ルート生成時の最大ウェイポイント数 */
 const MAX_WAYPOINTS = 20
@@ -390,7 +414,43 @@ async function optimizeWaypointCount(
   }
 }
 
-// ===== メイン最適化関数 =====
+// ===== 重複度計算関数 =====
+
+/**
+ * ルートパス内での重複度を計算
+ * @param routePath ルート上の座標列
+ * @returns 重複度（0-1、低いほど重複が少ない）
+ */
+function calculateDuplicateRatio(routePath: Location[]): number {
+  if (routePath.length < 4) return 0
+
+  // ルートを前半と後半に分割
+  const midPoint = Math.floor(routePath.length / 2)
+  const firstHalf = routePath.slice(0, midPoint)
+  const secondHalf = routePath.slice(midPoint)
+
+  if (firstHalf.length === 0 || secondHalf.length === 0) return 0
+
+  let duplicateCount = 0
+
+  // 前半の各点について、後半で近い点があるかチェック
+  for (const point1 of firstHalf) {
+    for (const point2 of secondHalf) {
+      const distance = calculateStraightLineDistance(point1, point2)
+      if (distance * 1000 <= DUPLICATE_THRESHOLD_METERS) {
+        // 20m以内の近い点が見つかった
+        duplicateCount++
+        break // この point1 についてはカウント完了
+      }
+    }
+  }
+
+  // 重複度 = (重複した点の数) / (前半の点数)
+  const ratio = duplicateCount / firstHalf.length
+  return Math.min(ratio, 1.0)
+}
+
+// ===== メイン最適化関数（複数候補比較版）
 
 /**
  * ランニング時間から最適化された周回ルートを生成

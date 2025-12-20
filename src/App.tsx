@@ -41,7 +41,7 @@ import {
   geocodeAddress,
   reverseGeocodeLocation,
 } from './utils'
-import { generateOptimizedClosedRoute, OptimizedRoute } from './routeOptimizer.v2'
+import { generateOptimizedClosedRoute, OptimizedRoute } from './routeOptimizer.v3'
 
 /**
  * メインアプリケーションコンポーネント
