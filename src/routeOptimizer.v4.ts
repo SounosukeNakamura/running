@@ -25,8 +25,8 @@ import {
 
 // ===== 定数 =====
 const RUNNING_PACE_KM_PER_MIN = 1 / 6 // 6分/km標準ペース
-const NUM_ROUTE_CANDIDATES = 1 // 候補数：1個固定（最高速化）
-const SCALE_FACTORS = [1.0] // 標準スケール係数のみ
+const NUM_ROUTE_CANDIDATES = 2 // 候補数：2個（API負荷66%削減）
+const SCALE_FACTORS = [0.95, 1.05] // 2パターンのスケール係数
 const TIME_TOLERANCE_MIN = 2 // 分（最小許容値）
 
 /**
@@ -103,10 +103,10 @@ export async function generateOptimizedRoundTripRoute(
     const scaleFactor = SCALE_FACTORS[i]
     
     try {
-      console.log(`\n📍 ルートを生成中 (scale: ${scaleFactor.toFixed(2)})`)
+      console.log(`\n📍 候補${i + 1}を生成中 (scale: ${scaleFactor.toFixed(2)})`)
 
       // 最適なウェイポイント数を決定（固定値で簡潔に）
-      const waypointCount = 2 // 2個のウェイポイントを使用（高速化）
+      const waypointCount = 3 // 3個のウェイポイントを使用（バランス型）
 
       // 片道距離から推定される距離でウェイポイントを生成
       const estimatedOutboundDistance =
