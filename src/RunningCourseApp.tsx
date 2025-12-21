@@ -9,7 +9,6 @@ import {
   validateRoundTripRoute,
   estimateRunningDistance,
 } from './routeOptimizer.v4'
-import { displayRouteOnMap } from './geoloniaUtils'
 import { OptimizedRoute } from './routeOptimizer.v2'
 
 interface RouteGeneratorState {
@@ -136,9 +135,24 @@ export function RunningCourseApp() {
         loading: false,
       }))
 
-      // 地図に表示
-      if (mapRef.current && window.geolonia) {
-        await displayRouteOnMap(mapRef.current, generatedRoute.routePath, state.currentLocation)
+      // 地図を初期化してからルートを表示
+      if (window.initializeGeoloniaMaps && typeof window.initializeGeoloniaMaps === 'function') {
+        console.log('🗺️ Initializing Geolonia maps and displaying route...')
+        try {
+          window.initializeGeoloniaMaps()
+          
+          // 初期化完了後、ルートを表示
+          setTimeout(() => {
+            if (window.displayCourseOnMap && typeof window.displayCourseOnMap === 'function') {
+              console.log('🎯 Displaying course on map with', generatedRoute.routePath.length, 'points')
+              window.displayCourseOnMap(generatedRoute.routePath, { hideWaypointMarkers: true })
+            } else {
+              console.warn('⚠️ displayCourseOnMap function not available')
+            }
+          }, 100)
+        } catch (err) {
+          console.error('❌ Error initializing map:', err)
+        }
       }
     } catch (error) {
       setState((prev) => ({
@@ -452,7 +466,13 @@ export function RunningCourseApp() {
         {/* 地図 */}
         <section style={styles.mapPanel}>
           <h2 style={styles.sectionTitle}>🗺️ ルートマップ</h2>
-          <div ref={mapRef} style={styles.map} />
+          <div
+            ref={mapRef}
+            style={styles.map}
+            data-lat={state.route && state.currentLocation ? state.currentLocation.lat : undefined}
+            data-lng={state.route && state.currentLocation ? state.currentLocation.lng : undefined}
+            data-zoom="14"
+          />
           {!state.route && (
             <div style={styles.mapPlaceholder}>
               <p>コース生成後、ここにルートマップが表示されます</p>
@@ -724,6 +744,18 @@ const styles = {
     padding: '20px',
     marginTop: '40px',
   } as React.CSSProperties,
+}
+
+/**
+ * グローバル window オブジェクトの型定義
+ */
+declare global {
+  interface Window {
+    initializeGeoloniaMaps?: () => void
+    displayCourseOnMap?: (coursePoints: Array<{ lat: number; lng: number }>, options?: Record<string, any>) => void
+    geolonia?: any
+    geoloniaMapInstance?: any
+  }
 }
 
 export default RunningCourseApp
