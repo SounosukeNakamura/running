@@ -46,6 +46,34 @@ export function RunningCourseApp() {
   }, [])
 
   /**
+   * 現在地が確定したら地図を初期化
+   */
+  useEffect(() => {
+    if (!state.currentLocation || !mapRef.current) {
+      return
+    }
+
+    console.log('📍 Current location confirmed:', state.currentLocation)
+    
+    // 地図コンテナに data-lat/data-lng 属性を設定
+    mapRef.current.setAttribute('data-lat', state.currentLocation.lat.toString())
+    mapRef.current.setAttribute('data-lng', state.currentLocation.lng.toString())
+    mapRef.current.setAttribute('data-zoom', '14')
+    
+    console.log('✓ Map container attributes set:', {
+      'data-lat': state.currentLocation.lat,
+      'data-lng': state.currentLocation.lng,
+      'data-zoom': 14,
+    })
+    
+    // Geolonia初期化
+    if (window.initializeGeoloniaMaps && typeof window.initializeGeoloniaMaps === 'function') {
+      console.log('🗺️ Calling initializeGeoloniaMaps()...')
+      window.initializeGeoloniaMaps()
+    }
+  }, [state.currentLocation])
+
+  /**
    * GPS位置情報を初期化
    */
   const initializeLocation = async () => {
@@ -135,24 +163,15 @@ export function RunningCourseApp() {
         loading: false,
       }))
 
-      // 地図を初期化してからルートを表示
-      if (window.initializeGeoloniaMaps && typeof window.initializeGeoloniaMaps === 'function') {
-        console.log('🗺️ Initializing Geolonia maps and displaying route...')
-        try {
-          window.initializeGeoloniaMaps()
-          
-          // 初期化完了後、ルートを表示
-          setTimeout(() => {
-            if (window.displayCourseOnMap && typeof window.displayCourseOnMap === 'function') {
-              console.log('🎯 Displaying course on map with', generatedRoute.routePath.length, 'points')
-              window.displayCourseOnMap(generatedRoute.routePath, { hideWaypointMarkers: true })
-            } else {
-              console.warn('⚠️ displayCourseOnMap function not available')
-            }
-          }, 100)
-        } catch (err) {
-          console.error('❌ Error initializing map:', err)
-        }
+      // ルート生成後、地図にルートを表示
+      console.log('🎯 Route generation completed. Preparing to display on map...')
+      
+      if (window.displayCourseOnMap && typeof window.displayCourseOnMap === 'function') {
+        console.log('📍 Calling displayCourseOnMap with', generatedRoute.routePath.length, 'points')
+        // displayCourseOnMapは内部でmapインスタンスをチェックし、なければリトライする
+        window.displayCourseOnMap(generatedRoute.routePath, { hideWaypointMarkers: true })
+      } else {
+        console.warn('⚠️ displayCourseOnMap function not available')
       }
     } catch (error) {
       setState((prev) => ({
@@ -469,8 +488,6 @@ export function RunningCourseApp() {
           <div
             ref={mapRef}
             style={styles.map}
-            data-lat={state.route && state.currentLocation ? state.currentLocation.lat : undefined}
-            data-lng={state.route && state.currentLocation ? state.currentLocation.lng : undefined}
             data-zoom="14"
           />
           {!state.route && (
