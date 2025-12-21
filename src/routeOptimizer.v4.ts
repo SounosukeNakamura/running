@@ -95,11 +95,11 @@ export async function generateOptimizedRoundTripRoute(
   const candidates: RoundTripCandidate[] = []
   const attemptLog: { scaleFactor: number; waypointCount: number; reason: string }[] = []
 
-  // 探索パターン: より広いスケール係数と複数のウェイポイント組み合わせ
+  // 探索パターン: 小さめの範囲で3パターン試す（スケール 0.8, 1.0, 1.2）
   const searchPatterns = [
-    { scaleBases: [0.8, 0.9, 1.0, 1.1, 1.2], waypoints: [2, 3, 4] },
-    { scaleBases: [0.7, 1.3], waypoints: [2, 3, 4, 5] },
-    { scaleBases: [0.85, 0.95, 1.05, 1.15], waypoints: [3] },
+    { scaleBases: [0.8, 1.0, 1.2], waypoints: [2] },
+    { scaleBases: [0.8, 1.0, 1.2], waypoints: [3] },
+    { scaleBases: [0.8, 1.0, 1.2], waypoints: [4] },
   ]
 
   for (const pattern of searchPatterns) {
@@ -110,8 +110,9 @@ export async function generateOptimizedRoundTripRoute(
         try {
           console.log(`   📊 候補生成中: scale=${scaleFactor.toFixed(2)}, waypoints=${waypointCount}`)
 
-          // 正しい距離計算：30分なら 30/6=5km、片道2.5km
-          const estimatedTotalDistance = desiredRunningMinutes / RUNNING_PACE_KM_PER_MIN
+          // 正しい距離計算：時間 × 速度 = 距離
+          // 30分 × (1/6 km/分) = 5km
+          const estimatedTotalDistance = desiredRunningMinutes * RUNNING_PACE_KM_PER_MIN
           const estimatedOutboundDistance = (estimatedTotalDistance / 2) * scaleFactor
 
           console.log(`      目標距離: ${estimatedTotalDistance.toFixed(2)}km (往復), 往路目標: ${estimatedOutboundDistance.toFixed(2)}km`)
@@ -122,14 +123,16 @@ export async function generateOptimizedRoundTripRoute(
             waypointCount
           )
 
-          // ウェイポイント検証：現在地から5km以上離れていないか確認
+          // ウェイポイント検証：現在地から遠すぎないか確認
+          // 往路目標が 2～3km なら、WPの直線距離は 1～2km 程度が妥当
+          const maxWaypointDistance = estimatedOutboundDistance * 1.5 // 往路目標の1.5倍まで許容
           for (let i = 0; i < outboundWaypoints.length; i++) {
             const wp = outboundWaypoints[i]
             const dist = calculateStraightLineDistance(startLocation, wp)
             console.log(`      WP${i + 1}: (${wp.lat.toFixed(5)}, ${wp.lng.toFixed(5)}) - 直線距離: ${(dist * 1000).toFixed(0)}m`)
-            if (dist > 10) {
-              console.log(`      ⚠️  警告: ウェイポイント${i + 1}が10km以上離れています。スキップします。`)
-              throw new Error(`Waypoint ${i + 1} is too far (${dist.toFixed(1)}km)`)
+            if (dist > maxWaypointDistance) {
+              console.log(`      ⚠️  警告: ウェイポイント${i + 1}が遠すぎます (${(dist * 1000).toFixed(0)}m > ${(maxWaypointDistance * 1000).toFixed(0)}m)。スキップします。`)
+              throw new Error(`Waypoint ${i + 1} is too far (${dist.toFixed(2)}km > ${maxWaypointDistance.toFixed(2)}km)`)
             }
           }
 
@@ -146,7 +149,7 @@ export async function generateOptimizedRoundTripRoute(
 
           console.log(`      → 候補時間: ${(roundTripTime / 60).toFixed(1)}分 / 距離: ${roundTripDistance.toFixed(2)}km`)
 
-          // 異常値チェック：目標距離の3倍以上は棄却（例: 30分指定で15km超のルートは異常）
+          // 異常値チェック：目標距離の3倍以上は棄却
           if (roundTripDistance > estimatedTotalDistance * 3) {
             const reason = `異常な距離: ${roundTripDistance.toFixed(2)}km (目標${estimatedTotalDistance.toFixed(2)}kmの3倍超)`
             console.log(`      ⏭️  ${reason}`)
