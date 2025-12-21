@@ -25,8 +25,8 @@ import {
 
 // ===== 定数 =====
 const RUNNING_PACE_KM_PER_MIN = 1 / 6 // 6分/km標準ペース
-const NUM_ROUTE_CANDIDATES = 3 // 候補数：常に3個固定
-const SCALE_FACTORS = [0.9, 1.0, 1.1] // 3パターンのスケール係数
+const NUM_ROUTE_CANDIDATES = 1 // 候補数：1個固定（最高速化）
+const SCALE_FACTORS = [1.0] // 標準スケール係数のみ
 const TIME_TOLERANCE_MIN = 2 // 分（最小許容値）
 
 /**
@@ -98,15 +98,15 @@ export async function generateOptimizedRoundTripRoute(
   // 片道時間の目標（=往復時間の半分）
   const targetOutboundTime = targetTime / 2
 
-  // 3個のスケール係数でそれぞれ1つずつ候補を生成
+  // スケール係数で候補を生成
   for (let i = 0; i < SCALE_FACTORS.length; i++) {
     const scaleFactor = SCALE_FACTORS[i]
     
     try {
-      console.log(`\n📍 候補${i + 1}を生成中 (scale: ${scaleFactor.toFixed(2)})`)
+      console.log(`\n📍 ルートを生成中 (scale: ${scaleFactor.toFixed(2)})`)
 
       // 最適なウェイポイント数を決定（固定値で簡潔に）
-      const waypointCount = 4 // 4個のウェイポイントを使用
+      const waypointCount = 2 // 2個のウェイポイントを使用（高速化）
 
       // 片道距離から推定される距離でウェイポイントを生成
       const estimatedOutboundDistance =
@@ -120,7 +120,12 @@ export async function generateOptimizedRoundTripRoute(
 
       // 往路のルート情報を取得
       const closedOutboundWaypoints = [startLocation, ...outboundWaypoints, startLocation]
-      const outboundRouteInfo = await evaluateRoute(startLocation, outboundWaypoints)
+      
+      // API呼び出しを並列実行（高速化）
+      const [outboundRouteInfo, routeGeometry] = await Promise.all([
+        evaluateRoute(startLocation, outboundWaypoints),
+        getClosedRouteGeometry(closedOutboundWaypoints)
+      ])
 
       // 往復時間を計算
       const roundTripTime = outboundRouteInfo.estimatedTime * 2 * 60 // 秒
@@ -129,14 +134,14 @@ export async function generateOptimizedRoundTripRoute(
       // 時間制約チェック
       if (roundTripTime > maxAllowedTime) {
         console.log(
-          `   ⏱️ 時間超過: ${(roundTripTime / 60).toFixed(1)}分 > ${maxAllowedTime / 60}分 → スキップ`
+          `   ⏱️ 時間超過: ${(roundTripTime / 60).toFixed(1)}分`
         )
         continue
       }
 
       if (roundTripTime < minAllowedTime) {
         console.log(
-          `   ⏱️ 時間不足: ${(roundTripTime / 60).toFixed(1)}分 < ${minAllowedTime / 60}分 → スキップ`
+          `   ⏱️ 時間不足: ${(roundTripTime / 60).toFixed(1)}分`
         )
         continue
       }
@@ -144,7 +149,6 @@ export async function generateOptimizedRoundTripRoute(
       // ルートパスを取得
       let routePath: Location[] = []
       try {
-        const routeGeometry = await getClosedRouteGeometry(closedOutboundWaypoints)
         // 往路のパスを取得
         const pathLength = routeGeometry.path.length
         const midIndex = Math.ceil(pathLength / 2)
