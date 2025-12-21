@@ -15,6 +15,8 @@ import { OptimizedRoute } from './routeOptimizer.v2'
 interface RouteGeneratorState {
   desiredMinutes: number
   currentLocation: { lat: number; lng: number } | null
+  currentAddress: string | null // 住所
+  addressLoading: boolean // 住所取得中
   route: OptimizedRoute | null
   loading: boolean
   error: string | null
@@ -28,6 +30,8 @@ export function RunningCourseApp() {
   const [state, setState] = useState<RouteGeneratorState>({
     desiredMinutes: 30,
     currentLocation: null,
+    currentAddress: null,
+    addressLoading: false,
     route: null,
     loading: false,
     error: null,
@@ -49,14 +53,37 @@ export function RunningCourseApp() {
     return new Promise<void>((resolve) => {
       if ('geolocation' in navigator) {
         navigator.geolocation.getCurrentPosition(
-          (position) => {
+          async (position) => {
+            const loc = {
+              lat: position.coords.latitude,
+              lng: position.coords.longitude,
+            }
             setState((prev) => ({
               ...prev,
-              currentLocation: {
-                lat: position.coords.latitude,
-                lng: position.coords.longitude,
-              },
+              currentLocation: loc,
+              addressLoading: true,
             }))
+            
+            // 逆ジオコーディングで住所を取得
+            try {
+              const response = await fetch(
+                `https://nominatim.openstreetmap.org/reverse?format=json&lat=${loc.lat}&lon=${loc.lng}&accept-language=ja`
+              )
+              const data = await response.json()
+              const address = data.address?.['ja:address'] || data.display_name || '住所を取得できませんでした'
+              setState((prev) => ({
+                ...prev,
+                currentAddress: address,
+                addressLoading: false,
+              }))
+            } catch (error) {
+              console.error('住所取得エラー:', error)
+              setState((prev) => ({
+                ...prev,
+                currentAddress: '住所を取得できませんでした',
+                addressLoading: false,
+              }))
+            }
             resolve()
           },
           (error) => {
@@ -65,6 +92,7 @@ export function RunningCourseApp() {
             setState((prev) => ({
               ...prev,
               currentLocation: { lat: 35.6762, lng: 139.7674 },
+              currentAddress: '東京駅周辺',
               error: 'GPS位置情報の取得に失敗しました。デフォルト位置を使用します。',
             }))
             resolve()
@@ -75,6 +103,7 @@ export function RunningCourseApp() {
         setState((prev) => ({
           ...prev,
           currentLocation: { lat: 35.6762, lng: 139.7674 },
+          currentAddress: '東京駅周辺',
           error: 'ブラウザがGPSに対応していません。',
         }))
         resolve()
@@ -198,8 +227,16 @@ export function RunningCourseApp() {
           <h2 style={styles.sectionTitle}>コース設定</h2>
 
           <div style={styles.inputGroup}>
-            <label style={styles.label}>走りたい時間（分）</label>
-            <div style={styles.timeInput}>
+            <label style={styles.label}>⏱️ 走りたい時間</label>
+            <div style={{ marginTop: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px', marginBottom: '12px' }}>
+                <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#5C6BC0' }}>
+                  {state.desiredMinutes}分
+                </div>
+                <div style={{ fontSize: '13px', color: '#666' }}>
+                  許容範囲: {Math.max(5, state.desiredMinutes - 2)}～{state.desiredMinutes}分
+                </div>
+              </div>
               <input
                 type="range"
                 min="5"
@@ -212,19 +249,24 @@ export function RunningCourseApp() {
                 disabled={state.loading}
                 style={styles.slider}
               />
-              <span style={styles.timeDisplay}>{state.desiredMinutes}分</span>
+              <p style={{ margin: '8px 0 0 0', fontSize: '12px', color: '#999' }}>
+                推定走行距離: {estimateRunningDistance(state.desiredMinutes / 2).toFixed(2)}km × 2 = 
+                {(estimateRunningDistance(state.desiredMinutes / 2) * 2).toFixed(2)}km
+              </p>
             </div>
-            <p style={styles.hint}>
-              推定走行距離: {estimateRunningDistance(state.desiredMinutes / 2).toFixed(2)}km × 2
-            </p>
           </div>
 
           {state.currentLocation && (
             <div style={styles.inputGroup}>
-              <label style={styles.label}>現在地</label>
-              <p style={styles.locationText}>
-                {state.currentLocation.lat.toFixed(5)}, {state.currentLocation.lng.toFixed(5)}
-              </p>
+              <label style={styles.label}>📍 現在地</label>
+              <div style={{ marginTop: '8px' }}>
+                <p style={{ margin: '4px 0', fontSize: '14px', fontWeight: 'bold', color: '#333' }}>
+                  {state.addressLoading ? '住所を取得中...' : state.currentAddress || '住所を取得できませんでした'}
+                </p>
+                <p style={{ margin: '4px 0', fontSize: '12px', color: '#666' }}>
+                  {state.currentLocation.lat.toFixed(5)}, {state.currentLocation.lng.toFixed(5)}
+                </p>
+              </div>
             </div>
           )}
 
@@ -270,8 +312,10 @@ export function RunningCourseApp() {
         {/* エラーメッセージ */}
         {state.error && (
           <section style={{ ...styles.alert, ...styles.alertError }}>
-            <h3>❌ エラー</h3>
-            <p>{state.error}</p>
+            <h3>❌ コース生成に失敗しました</h3>
+            <div style={{ whiteSpace: 'pre-wrap', fontSize: '14px', lineHeight: '1.6', color: '#333' }}>
+              {state.error}
+            </div>
           </section>
         )}
 
@@ -282,35 +326,45 @@ export function RunningCourseApp() {
             <section style={styles.resultPanel}>
               <h2 style={styles.sectionTitle}>✅ 生成されたコース</h2>
 
+              <div style={{ marginBottom: '20px', padding: '16px', backgroundColor: '#F5F5F5', borderRadius: '8px', border: '2px solid #5C6BC0' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '8px' }}>
+                  <div>
+                    <div style={{ fontSize: '14px', color: '#666', marginBottom: '4px' }}>推定走行時間</div>
+                    <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#5C6BC0' }}>
+                      {state.route.estimatedTime.toFixed(1)}分
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: '12px', color: '#666', marginBottom: '4px' }}>目標時間</div>
+                    <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#333' }}>
+                      {state.desiredMinutes}分
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: '12px', color: '#666', marginBottom: '4px' }}>差</div>
+                    <div
+                      style={{
+                        fontSize: '18px',
+                        fontWeight: 'bold',
+                        color:
+                          Math.abs(state.route.estimatedTime - state.desiredMinutes) < 2
+                            ? '#4CAF50'
+                            : '#FF9800',
+                      }}
+                    >
+                      {(state.route.estimatedTime - state.desiredMinutes).toFixed(1)}分
+                    </div>
+                  </div>
+                </div>
+                <div style={{ fontSize: '12px', color: '#999' }}>
+                  ✓ 許容範囲内: {Math.max(5, state.desiredMinutes - 2)}～{state.desiredMinutes}分
+                </div>
+              </div>
+
               <div style={styles.routeStats}>
                 <div style={styles.statCard}>
                   <div style={styles.statLabel}>往復距離</div>
                   <div style={styles.statValue}>{state.route.totalDistance.toFixed(2)}km</div>
-                </div>
-
-                <div style={styles.statCard}>
-                  <div style={styles.statLabel}>推定時間</div>
-                  <div style={styles.statValue}>{state.route.estimatedTime.toFixed(1)}分</div>
-                </div>
-
-                <div style={styles.statCard}>
-                  <div style={styles.statLabel}>目標時間</div>
-                  <div style={styles.statValue}>{state.desiredMinutes}分</div>
-                </div>
-
-                <div style={styles.statCard}>
-                  <div style={styles.statLabel}>時間差</div>
-                  <div
-                    style={{
-                      ...styles.statValue,
-                      color:
-                        Math.abs(state.route.estimatedTime - state.desiredMinutes) < 2
-                          ? '#4CAF50'
-                          : '#FF9800',
-                    }}
-                  >
-                    {(state.route.estimatedTime - state.desiredMinutes).toFixed(1)}分
-                  </div>
                 </div>
 
                 <div style={styles.statCard}>
