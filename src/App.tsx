@@ -219,7 +219,6 @@ export default function App() {
     e.preventDefault()
     setError('')
     setWeatherError('')
-    setCourse([])
     setOptimizedRoute(null)
 
     // バリデーション
@@ -409,7 +408,7 @@ export default function App() {
         </section>
 
         {/* コース情報セクション */}
-        {course.length > 0 && (
+        {optimizedRoute && (
           <section className="card">
             <h2>🗺️ 提案コース</h2>
 
