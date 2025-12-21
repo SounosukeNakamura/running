@@ -63,7 +63,6 @@ export default function App() {
   const [weatherError, setWeatherError] = useState('')
 
   // コース情報
-  const [course, setCourse] = useState<CoursePoint[]>([])
   const [courseDistance, setCourseDistance] = useState(0)
   const [optimizedRoute, setOptimizedRoute] = useState<OptimizedRoute | null>(null)
 
@@ -247,10 +246,6 @@ export default function App() {
 
       setOptimizedRoute(route)
       setCourseDistance(route.totalDistance)
-
-      // ウェイポイント情報をCoursePointに変換（後方互換性）
-      const coursePoints: CoursePoint[] = (route.waypoints || []) as CoursePoint[]
-      setCourse(coursePoints)
 
       // 地図にコースを表示（ルートパスを使用）
       if ((window as any).displayCourseOnMap) {
