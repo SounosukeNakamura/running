@@ -25,10 +25,8 @@ import {
 
 // ===== 定数 =====
 const RUNNING_PACE_KM_PER_MIN = 1 / 6 // 6分/km標準ペース
-const MIN_WAYPOINT_COUNT = 2
-const MAX_WAYPOINT_COUNT = 8
-const MIN_ROUTE_CANDIDATES = 5
-const MAX_ROUTE_CANDIDATES = 20
+const NUM_ROUTE_CANDIDATES = 3 // 候補数：常に3個固定
+const SCALE_FACTORS = [0.9, 1.0, 1.1] // 3パターンのスケール係数
 const TIME_TOLERANCE_MIN = 2 // 分（最小許容値）
 
 /**
@@ -100,96 +98,97 @@ export async function generateOptimizedRoundTripRoute(
   // 片道時間の目標（=往復時間の半分）
   const targetOutboundTime = targetTime / 2
 
-  // 複数のウェイポイント数で試す
-  for (let waypointCount = MIN_WAYPOINT_COUNT; waypointCount <= MAX_WAYPOINT_COUNT; waypointCount++) {
-    // 各ウェイポイント数に対して複数のスケール係数を試す
-    const scaleFactors = [0.85, 0.9, 0.95, 1.0, 1.05, 1.1]
+  // 3個のスケール係数でそれぞれ1つずつ候補を生成
+  for (let i = 0; i < SCALE_FACTORS.length; i++) {
+    const scaleFactor = SCALE_FACTORS[i]
+    
+    try {
+      console.log(`\n📍 候補${i + 1}を生成中 (scale: ${scaleFactor.toFixed(2)})`)
 
-    for (const scaleFactor of scaleFactors) {
-      if (candidates.length >= MAX_ROUTE_CANDIDATES) break
+      // 最適なウェイポイント数を決定（固定値で簡潔に）
+      const waypointCount = 4 // 4個のウェイポイントを使用
 
-      try {
-        // 片道距離から推定される距離でウェイポイントを生成
-        const estimatedOutboundDistance =
-          (targetOutboundTime / 60) * (10 / RUNNING_PACE_KM_PER_MIN) * scaleFactor
+      // 片道距離から推定される距離でウェイポイントを生成
+      const estimatedOutboundDistance =
+        (targetOutboundTime / 60) * (10 / RUNNING_PACE_KM_PER_MIN) * scaleFactor
 
-        const outboundWaypoints = generateCircularWaypoints(
-          startLocation,
-          estimatedOutboundDistance,
-          waypointCount
-        )
+      const outboundWaypoints = generateCircularWaypoints(
+        startLocation,
+        estimatedOutboundDistance,
+        waypointCount
+      )
 
-        // 往路のルート情報を取得
-        const closedOutboundWaypoints = [startLocation, ...outboundWaypoints, startLocation]
-        const outboundRouteInfo = await evaluateRoute(startLocation, outboundWaypoints)
+      // 往路のルート情報を取得
+      const closedOutboundWaypoints = [startLocation, ...outboundWaypoints, startLocation]
+      const outboundRouteInfo = await evaluateRoute(startLocation, outboundWaypoints)
 
-        // 往復時間を計算
-        const roundTripTime = outboundRouteInfo.estimatedTime * 2 * 60 // 秒
-        const roundTripDistance = outboundRouteInfo.totalDistance * 2
+      // 往復時間を計算
+      const roundTripTime = outboundRouteInfo.estimatedTime * 2 * 60 // 秒
+      const roundTripDistance = outboundRouteInfo.totalDistance * 2
 
-        // 時間制約チェック
-        if (roundTripTime > maxAllowedTime) {
-          console.log(
-            `   ⏱️ スキップ（時間超過）: ${waypointCount}pts/scale${scaleFactor.toFixed(2)} = ${(roundTripTime / 60).toFixed(1)}分 > ${maxAllowedTime / 60}分`
-          )
-          continue
-        }
-
-        if (roundTripTime < minAllowedTime) {
-          console.log(
-            `   ⏱️ スキップ（時間不足）: ${waypointCount}pts/scale${scaleFactor.toFixed(2)} = ${(roundTripTime / 60).toFixed(1)}分 < ${minAllowedTime / 60}分`
-          )
-          continue
-        }
-
-        // ルートパスを取得
-        let routePath: Location[] = []
-        try {
-          const routeGeometry = await getClosedRouteGeometry(closedOutboundWaypoints)
-          // 往路のパスを取得
-          const pathLength = routeGeometry.path.length
-          const midIndex = Math.ceil(pathLength / 2)
-          const outboundPath = routeGeometry.path.slice(0, midIndex)
-          // 往復パスを構築（往路 + 帰路の逆順）
-          const returnPath = reverseRoutePath(outboundPath.slice(1)) // 中間地点が重複しないよう調整
-          routePath = [...outboundPath, ...returnPath]
-        } catch (error) {
-          routePath = closedOutboundWaypoints
-        }
-
-        // スコア計算（時間が目標に近いほど低スコア）
-        const timeDiff = Math.abs(targetTime - roundTripTime)
-        const score = timeDiff
-
-        const candidate: RoundTripCandidate = {
-          outboundWaypoints,
-          routeInfo: {
-            totalDistance: roundTripDistance,
-            estimatedTime: roundTripTime / 60, // 分
-            segments: outboundRouteInfo.segments,
-          },
-          routePath,
-          estimatedTimeSeconds: roundTripTime,
-          score,
-          outboundDistance: outboundRouteInfo.totalDistance,
-          outboundTimeSeconds: outboundRouteInfo.estimatedTime * 60,
-          roundTripDistance,
-          roundTripTimeSeconds: roundTripTime,
-        }
-
-        candidates.push(candidate)
-
+      // 時間制約チェック
+      if (roundTripTime > maxAllowedTime) {
         console.log(
-          `   ✓ ${waypointCount}pts/scale${scaleFactor.toFixed(2)}: ` +
-          `往路${(candidate.outboundDistance).toFixed(2)}km/${(candidate.outboundTimeSeconds / 60).toFixed(1)}分, ` +
-          `往復${roundTripDistance.toFixed(2)}km/${(roundTripTime / 60).toFixed(1)}分`
-        )
-      } catch (error) {
-        console.log(
-          `   ✗ ${waypointCount}pts/scale${scaleFactor.toFixed(2)}: エラー発生`
+          `   ⏱️ 時間超過: ${(roundTripTime / 60).toFixed(1)}分 > ${maxAllowedTime / 60}分 → スキップ`
         )
         continue
       }
+
+      if (roundTripTime < minAllowedTime) {
+        console.log(
+          `   ⏱️ 時間不足: ${(roundTripTime / 60).toFixed(1)}分 < ${minAllowedTime / 60}分 → スキップ`
+        )
+        continue
+      }
+
+      // ルートパスを取得
+      let routePath: Location[] = []
+      try {
+        const routeGeometry = await getClosedRouteGeometry(closedOutboundWaypoints)
+        // 往路のパスを取得
+        const pathLength = routeGeometry.path.length
+        const midIndex = Math.ceil(pathLength / 2)
+        const outboundPath = routeGeometry.path.slice(0, midIndex)
+        // 往復パスを構築（往路 + 帰路の逆順）
+        const returnPath = reverseRoutePath(outboundPath.slice(1)) // 中間地点が重複しないよう調整
+        routePath = [...outboundPath, ...returnPath]
+      } catch (error) {
+        routePath = closedOutboundWaypoints
+      }
+
+      // スコア計算：
+      // 1. 時間が目標に近いほど低スコア（一次評価）
+      // 2. ウェイポイント数が少ないほど低スコア（単純さ = 二次評価）
+      const timeDiff = Math.abs(targetTime - roundTripTime)
+      const simplicity = waypointCount * 10 // ウェイポイント数による単純さスコア
+      const score = timeDiff + simplicity
+
+      const candidate: RoundTripCandidate = {
+        outboundWaypoints,
+        routeInfo: {
+          totalDistance: roundTripDistance,
+          estimatedTime: roundTripTime / 60, // 分
+          segments: outboundRouteInfo.segments,
+        },
+        routePath,
+        estimatedTimeSeconds: roundTripTime,
+        score,
+        outboundDistance: outboundRouteInfo.totalDistance,
+        outboundTimeSeconds: outboundRouteInfo.estimatedTime * 60,
+        roundTripDistance,
+        roundTripTimeSeconds: roundTripTime,
+      }
+
+      candidates.push(candidate)
+
+      console.log(
+        `   ✓ 候補${i + 1} 生成成功: ` +
+        `往復${roundTripDistance.toFixed(2)}km / ${(roundTripTime / 60).toFixed(1)}分 ` +
+        `(差: ${(roundTripTime / 60 - desiredRunningMinutes).toFixed(1)}分, スコア: ${score.toFixed(1)})`
+      )
+    } catch (error) {
+      console.log(`   ✗ 候補${i + 1} 生成失敗: ${error instanceof Error ? error.message : 'エラー発生'}`)
+      continue
     }
   }
 
@@ -201,19 +200,34 @@ export async function generateOptimizedRoundTripRoute(
     )
   }
 
+  console.log(`\n📊 候補評価結果:`)
+  candidates.forEach((cand, idx) => {
+    const timeDiff = (cand.roundTripTimeSeconds / 60) - desiredRunningMinutes
+    console.log(
+      `   候補${idx + 1}: 往復${cand.roundTripDistance.toFixed(2)}km / ` +
+      `${(cand.roundTripTimeSeconds / 60).toFixed(1)}分 (差: ${timeDiff.toFixed(1)}分, スコア: ${cand.score.toFixed(1)})`
+    )
+  })
+
   // スコア順でソート（低いほど良い）
+  // 評価基準：
+  // 1. 時間制約を満たすことが前提
+  // 2. 目標時間に最も近い（時間差が最小）
+  // 3. 同率の場合は単純さ（ウェイポイント数が少ない）を優先
   candidates.sort((a, b) => a.score - b.score)
 
   const bestCandidate = candidates[0]
+  const timeDiffMinutes = (bestCandidate.roundTripTimeSeconds / 60) - desiredRunningMinutes
 
   console.log(`\n✅ 最適ルートが決定されました`)
-  console.log(`   検討候補数: ${candidates.length}個`)
+  console.log(`   選択: 候補1（スコア最小: ${bestCandidate.score.toFixed(1)}）`)
   console.log(`   往路距離: ${bestCandidate.outboundDistance.toFixed(2)}km`)
   console.log(`   往路時間: ${(bestCandidate.outboundTimeSeconds / 60).toFixed(1)}分`)
   console.log(`   往復距離: ${bestCandidate.roundTripDistance.toFixed(2)}km`)
   console.log(`   往復時間: ${(bestCandidate.roundTripTimeSeconds / 60).toFixed(1)}分`)
   console.log(`   目標時間: ${desiredRunningMinutes}分`)
-  console.log(`   時間差: ${((bestCandidate.roundTripTimeSeconds / 60) - desiredRunningMinutes).toFixed(1)}分`)
+  console.log(`   時間差: ${timeDiffMinutes.toFixed(1)}分`)
+  console.log(`   ✓ 時間制約充足: ${minAllowedTime / 60}分 ≤ ${(bestCandidate.roundTripTimeSeconds / 60).toFixed(1)}分 ≤ ${maxAllowedTime / 60}分`)
 
   return {
     startLocation,

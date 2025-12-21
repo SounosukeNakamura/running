@@ -202,7 +202,6 @@ fetchWeatherData(location: Location, apiKey: string): Promise<WeatherData>
 
 // バリデーション関数
 validateRunningMinutes(value: unknown): ValidationResult
-validateLocation(lat: unknown, lng: unknown): ValidationResult
 ```
 
 ### App.tsx - Reactコンポーネント
@@ -232,10 +231,6 @@ validateLocation(lat: unknown, lng: unknown): ValidationResult
 ```typescript
 // 走行時間：1～300分の整数
 validateRunningMinutes(value)
-// → { valid: boolean, error?: string }
-
-// 緯度・経度：有効な座標値
-validateLocation(lat, lng)
 // → { valid: boolean, error?: string }
 ```
 

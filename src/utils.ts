@@ -27,11 +27,6 @@ export interface WeatherData {
   }
 }
 
-export interface CoursePoint {
-  lat: number
-  lng: number
-}
-
 // ===== 定数 =====
 
 /** ランニング想定ペース（分/km）*/
@@ -104,9 +99,7 @@ export function getLocationByBearingAndDistance(
  * @param minutes ランニング時間（分）
  * @returns 走行距離（km）
  */
-export function calculateRunningDistance(minutes: number): number {
-  return minutes / RUNNING_PACE_MIN_PER_KM
-}
+// calculateRunningDistance は未使用のため削除
 
 /**
  * 円周上のコース（ポイント群）を生成
@@ -115,28 +108,7 @@ export function calculateRunningDistance(minutes: number): number {
  * @param points 生成するポイント数（デフォルト：8）
  * @returns コース上の座標配列
  */
-export function generateCircularCourse(
-  center: Location,
-  totalDistanceKm: number,
-  points: number = 8
-): CoursePoint[] {
-  // 円周 = 2πr より、半径を計算
-  // 走行距離は往復なので、実際の円周はその半分
-  const radius = totalDistanceKm / (2 * Math.PI)
-
-  const course: CoursePoint[] = []
-
-  for (let i = 0; i < points; i++) {
-    const angle = (i / points) * 360 // 度
-    const location = getLocationByBearingAndDistance(center, angle, radius)
-    course.push(location)
-  }
-
-  // 最初の点に戻る
-  course.push(course[0])
-
-  return course
-}
+// generateCircularCourse は未使用のため削除
 
 // ===== API呼び出し関数 =====
 
@@ -389,21 +361,4 @@ export function validateRunningMinutes(value: unknown): { valid: boolean; error?
 /**
  * 緯度経度の入力値をバリデーション
  */
-export function validateLocation(lat: unknown, lng: unknown): { valid: boolean; error?: string } {
-  const latitude = Number(lat)
-  const longitude = Number(lng)
 
-  if (isNaN(latitude) || isNaN(longitude)) {
-    return { valid: false, error: '緯度と経度は数値で入力してください' }
-  }
-
-  if (latitude < -90 || latitude > 90) {
-    return { valid: false, error: '緯度は-90～90の範囲で入力してください' }
-  }
-
-  if (longitude < -180 || longitude > 180) {
-    return { valid: false, error: '経度は-180～180の範囲で入力してください' }
-  }
-
-  return { valid: true }
-}

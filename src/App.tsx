@@ -32,12 +32,8 @@ import './App.css'
 import {
   Location,
   WeatherData,
-  CoursePoint,
-  calculateRunningDistance,
-  generateCircularCourse,
   fetchWeatherData,
   validateRunningMinutes,
-  validateLocation,
   geocodeAddress,
   reverseGeocodeLocation,
 } from './utils'
