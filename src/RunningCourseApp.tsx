@@ -8,9 +8,9 @@ import {
   generateOptimizedRoundTripRoute,
   validateRoundTripRoute,
   estimateRunningDistance,
-} from './src/routeOptimizer.v4'
-import { displayRouteOnMap } from './src/geoloniaUtils'
-import { OptimizedRoute } from './src/routeOptimizer.v2'
+} from './routeOptimizer.v4'
+import { displayRouteOnMap } from './geoloniaUtils'
+import { OptimizedRoute } from './routeOptimizer.v2'
 
 interface RouteGeneratorState {
   desiredMinutes: number
@@ -142,7 +142,7 @@ export function RunningCourseApp() {
     const shareText = `
 🏃 ランニングコース情報
 ・往復距離: ${state.route.totalDistance.toFixed(2)}km
-・推定時間: ${state.estimatedTime.toFixed(1)}分
+・推定時間: ${state.route.estimatedTime.toFixed(1)}分
 ・スタート地点: (${state.currentLocation?.lat.toFixed(5)}, ${state.currentLocation?.lng.toFixed(5)})
 
 詳細はアプリで確認してください。
