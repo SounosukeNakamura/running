@@ -166,15 +166,17 @@ export function generateCircularWaypoints(
   numWaypoints: number = 6
 ): Location[] {
   // 周回ルート：スタート → wp1 → wp2 → ... → wpN → スタート
-  // 直線距離半径を計算
-  const straightLineRadius = (maxDistanceKm * ROUTE_DISTANCE_RATIO) / (2 * Math.PI)
+  // maxDistanceKm は往路目標距離（例: 2.5km）
+  // WPは現在地から maxDistanceKm 程度の距離に配置する
+  // これにより OSRM が maxDistanceKm に相当するルートを生成する
 
   const waypoints: Location[] = []
 
   // 周回上に均等にウェイポイントを配置
   for (let i = 0; i < numWaypoints; i++) {
     const angle = (i / numWaypoints) * 360
-    const waypoint = getLocationByBearingAndDistance(startLocation, angle, straightLineRadius)
+    // 往路目標距離そのものを半径として使う（スケール係数を適用済みの値）
+    const waypoint = getLocationByBearingAndDistance(startLocation, angle, maxDistanceKm)
     waypoints.push(waypoint)
   }
 
