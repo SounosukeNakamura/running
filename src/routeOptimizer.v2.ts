@@ -154,7 +154,48 @@ export function getLocationByBearingAndDistance(
 // ===== ウェイポイント生成関数 =====
 
 /**
+ * 単一の中間地点（折り返し地点）を指定方位で生成
+ * 新仕様では「現在地 → 中間地点」の往路のみをOSRMで計算し、復路は同じ道を戻る
+ * @param startLocation スタート＝ゴール地点
+ * @param outboundDistanceKm 往路目標距離（km）（例: 2.5km）
+ * @param bearing 方位角（度）（0=北, 90=東, 180=南, 270=西）
+ * @returns 中間地点（往路目標距離の方向に配置）
+ */
+export function generateMidpointInDirection(
+  startLocation: Location,
+  outboundDistanceKm: number,
+  bearing: number
+): Location {
+  // 往路目標距離の方向に、その距離だけ離れた地点を中間地点とする
+  return getLocationByBearingAndDistance(startLocation, bearing, outboundDistanceKm)
+}
+
+/**
+ * 複数の方位で中間地点の候補を生成
+ * @param startLocation スタート地点
+ * @param outboundDistanceKm 往路目標距離（km）
+ * @param numCandidates 候補数
+ * @returns 中間地点の候補配列
+ */
+export function generateMidpointCandidates(
+  startLocation: Location,
+  outboundDistanceKm: number,
+  numCandidates: number = 3
+): Location[] {
+  const candidates: Location[] = []
+  
+  for (let i = 0; i < numCandidates; i++) {
+    const angle = (i / numCandidates) * 360 // 360度を均等分割
+    const candidate = generateMidpointInDirection(startLocation, outboundDistanceKm, angle)
+    candidates.push(candidate)
+  }
+  
+  return candidates
+}
+
+/**
  * スタート地点を中心とした周回用の初期ウェイポイントを生成
+ * （旧版：新仕様では使用しない）
  * @param startLocation スタート＝ゴール地点
  * @param maxDistanceKm 最大走行距離（km）
  * @param numWaypoints ウェイポイント数
@@ -186,7 +227,85 @@ export function generateCircularWaypoints(
 // ===== OSRM API 呼び出し関数 =====
 
 /**
+ * 往復ルート生成用: 片道（start → mid）のルート情報を取得
+ * OSRMには2点のみを指定し、往復全体ではなく片道のみの距離/時間を取得する
+ * @param startLocation スタート地点
+ * @param midLocation 中間地点（折り返し地点）
+ * @returns 片道のルート情報（往復計算はこの値 × 2）
+ */
+export async function getOutboundRouteGeometry(
+  startLocation: Location,
+  midLocation: Location
+): Promise<{
+  distance: number // km（片道）
+  duration: number // 秒（片道）
+  path: Location[] // 道路沿いの座標配列
+}> {
+  const coordinates = `${startLocation.lng},${startLocation.lat};${midLocation.lng},${midLocation.lat}`
+  const url = `${OSRM_SERVER}/route/v1/foot/${coordinates}?overview=full&geometries=geojson&steps=false`
+
+  try {
+    const response = await fetch(url)
+    if (!response.ok) {
+      throw new Error(`OSRM API error: ${response.status}`)
+    }
+
+    const data = await response.json()
+
+    if (!data.routes || data.routes.length === 0) {
+      throw new Error('No route found from OSRM')
+    }
+
+    const route = data.routes[0]
+    const distance = route.distance / 1000 // メートル → km
+    const duration = route.duration // 秒
+    const coordinates = route.geometry.coordinates
+
+    // [lng, lat] を {lat, lng} に変換
+    const path: Location[] = coordinates.map(([lng, lat]: [number, number]) => ({
+      lat,
+      lng,
+    }))
+
+    console.log(`    ✓ OSRM片道: ${distance.toFixed(2)}km / ${(duration / 60).toFixed(1)}分 (${path.length}点)`)
+
+    return {
+      distance,
+      duration,
+      path,
+    }
+  } catch (error) {
+    console.error('⚠️ OSRM getOutboundRouteGeometry error:', error)
+    // フォールバック：直線距離で代替
+    const straightDistance = calculateStraightLineDistance(startLocation, midLocation)
+    return {
+      distance: straightDistance,
+      duration: straightDistance * RUNNING_PACE_MIN_PER_KM * 60, // km * 分/km * 60秒/分 = 秒
+      path: [startLocation, midLocation],
+    }
+  }
+}
+
+/**
+ * 往復ルート全体を構築（片道結果から）
+ * @param outboundPath 往路のパス（start → mid）
+ * @param startLocation スタート地点
+ * @returns 往復ルート全体のパス（start → mid → start）
+ */
+export function buildRoundTripPath(outboundPath: Location[], startLocation: Location): Location[] {
+  // 復路は往路の逆順（ただしスタートは重複させない）
+  const reversePath = [...outboundPath].reverse()
+  
+  // start → mid → start の往復路を構築
+  // outboundPath の最後の点（mid）と reversePath の最初の点（mid）が重複するので除去
+  const returnPath = reversePath.slice(1) // 最初のmidを除外
+  
+  return [...outboundPath, ...returnPath]
+}
+
+/**
  * OSRM から複数ウェイポイント経由のルート情報を取得
+ * （旧版：周回ルート用。新仕様では使用しない）
  * @param waypoints スタート → 経由点 → ゴール（最初と最後が同じ場所）
  * @returns ルート情報
  */
