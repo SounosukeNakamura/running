@@ -110,14 +110,28 @@ export async function generateOptimizedRoundTripRoute(
         try {
           console.log(`   📊 候補生成中: scale=${scaleFactor.toFixed(2)}, waypoints=${waypointCount}`)
 
-          const estimatedOutboundDistance =
-            (targetTime / 2 / 60) * (10 / RUNNING_PACE_KM_PER_MIN) * scaleFactor
+          // 正しい距離計算：30分なら 30/6=5km、片道2.5km
+          const estimatedTotalDistance = desiredRunningMinutes / RUNNING_PACE_KM_PER_MIN
+          const estimatedOutboundDistance = (estimatedTotalDistance / 2) * scaleFactor
+
+          console.log(`      目標距離: ${estimatedTotalDistance.toFixed(2)}km (往復), 往路目標: ${estimatedOutboundDistance.toFixed(2)}km`)
 
           const outboundWaypoints = generateCircularWaypoints(
             startLocation,
             estimatedOutboundDistance,
             waypointCount
           )
+
+          // ウェイポイント検証：現在地から5km以上離れていないか確認
+          for (let i = 0; i < outboundWaypoints.length; i++) {
+            const wp = outboundWaypoints[i]
+            const dist = calculateStraightLineDistance(startLocation, wp)
+            console.log(`      WP${i + 1}: (${wp.lat.toFixed(5)}, ${wp.lng.toFixed(5)}) - 直線距離: ${(dist * 1000).toFixed(0)}m`)
+            if (dist > 10) {
+              console.log(`      ⚠️  警告: ウェイポイント${i + 1}が10km以上離れています。スキップします。`)
+              throw new Error(`Waypoint ${i + 1} is too far (${dist.toFixed(1)}km)`)
+            }
+          }
 
           const closedOutboundWaypoints = [startLocation, ...outboundWaypoints, startLocation]
           
@@ -131,6 +145,14 @@ export async function generateOptimizedRoundTripRoute(
           const roundTripDistance = outboundRouteInfo.totalDistance * 2
 
           console.log(`      → 候補時間: ${(roundTripTime / 60).toFixed(1)}分 / 距離: ${roundTripDistance.toFixed(2)}km`)
+
+          // 異常値チェック：目標距離の3倍以上は棄却（例: 30分指定で15km超のルートは異常）
+          if (roundTripDistance > estimatedTotalDistance * 3) {
+            const reason = `異常な距離: ${roundTripDistance.toFixed(2)}km (目標${estimatedTotalDistance.toFixed(2)}kmの3倍超)`
+            console.log(`      ⏭️  ${reason}`)
+            attemptLog.push({ scaleFactor, waypointCount, reason })
+            continue
+          }
 
           // 時間制約チェック
           if (roundTripTime > maxAllowedTime) {
