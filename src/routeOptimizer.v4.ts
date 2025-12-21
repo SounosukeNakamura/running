@@ -95,11 +95,11 @@ export async function generateOptimizedRoundTripRoute(
   const candidates: RoundTripCandidate[] = []
   const attemptLog: { scaleFactor: number; waypointCount: number; reason: string }[] = []
 
-  // 探索パターン1: 標準（2個スケール、3ウェイポイント）
+  // 探索パターン: より広いスケール係数と複数のウェイポイント組み合わせ
   const searchPatterns = [
-    { scaleBases: [0.95, 1.05], waypoints: [3] },
-    { scaleBases: [0.85, 1.15], waypoints: [2, 4] },
-    { scaleBases: [0.9, 1.0, 1.1], waypoints: [3] },
+    { scaleBases: [0.8, 0.9, 1.0, 1.1, 1.2], waypoints: [2, 3, 4] },
+    { scaleBases: [0.7, 1.3], waypoints: [2, 3, 4, 5] },
+    { scaleBases: [0.85, 0.95, 1.05, 1.15], waypoints: [3] },
   ]
 
   for (const pattern of searchPatterns) {
@@ -129,6 +129,8 @@ export async function generateOptimizedRoundTripRoute(
 
           const roundTripTime = outboundRouteInfo.estimatedTime * 2 * 60
           const roundTripDistance = outboundRouteInfo.totalDistance * 2
+
+          console.log(`      → 候補時間: ${(roundTripTime / 60).toFixed(1)}分 / 距離: ${roundTripDistance.toFixed(2)}km`)
 
           // 時間制約チェック
           if (roundTripTime > maxAllowedTime) {
