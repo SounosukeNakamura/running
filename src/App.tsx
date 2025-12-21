@@ -485,15 +485,4 @@ export default function App() {
   )
 }
 
-// グローバル型の拡張（Geolonia）
-declare global {
-  interface Window {
-    geolonia?: {
-      onReady(callback: () => void): void
-      maps?: Array<{
-        flyTo?(options: { center: [number, number]; zoom: number }): void
-        setCenter?(lnglat: [number, number]): void
-      }>
-    }
-  }
-}
+// Window 型定義は env.d.ts で定義済み

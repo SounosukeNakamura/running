@@ -32,3 +32,24 @@ interface ImportMeta {
 declare namespace React {
   export {}
 }
+/**
+ * グローバル window オブジェクトの型定義
+ * Geolonia maps と custom display functions
+ */
+declare global {
+  interface Window {
+    // Geolonia API
+    geolonia?: {
+      onReady(callback: () => void): void
+      maps?: Array<{
+        flyTo?(options: { center: [number, number]; zoom: number }): void
+        setCenter?(lnglat: [number, number]): void
+      }>
+    }
+    geoloniaMapInstance?: any
+    
+    // Map initialization and display functions
+    initializeGeoloniaMaps?: () => void
+    displayCourseOnMap?: (coursePoints: Array<{ lat: number; lng: number }>, options?: Record<string, any>) => void
+  }
+}

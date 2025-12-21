@@ -746,16 +746,4 @@ const styles = {
   } as React.CSSProperties,
 }
 
-/**
- * グローバル window オブジェクトの型定義
- */
-declare global {
-  interface Window {
-    initializeGeoloniaMaps?: () => void
-    displayCourseOnMap?: (coursePoints: Array<{ lat: number; lng: number }>, options?: Record<string, any>) => void
-    geolonia?: any
-    geoloniaMapInstance?: any
-  }
-}
-
 export default RunningCourseApp
