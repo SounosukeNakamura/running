@@ -32,10 +32,9 @@ interface ImportMeta {
 declare namespace React {
   export {}
 }
-/**
- * グローバル window オブジェクトの型定義
- * Geolonia maps と custom display functions
- */
+
+// グローバル window オブジェクトの型定義
+// Geolonia maps と custom display functions
 declare global {
   interface Window {
     // Geolonia API
@@ -53,3 +52,5 @@ declare global {
     displayCourseOnMap?: (coursePoints: Array<{ lat: number; lng: number }>, options?: Record<string, any>) => void
   }
 }
+
+export {}
