@@ -322,7 +322,8 @@ export async function reverseGeocodeLocation(location: Location): Promise<string
     }
 
     const data = await response.json()
-    console.log('Nominatim response address:', JSON.stringify(data.address, null, 2))
+    console.log('🔍 Nominatim response address:', JSON.stringify(data.address, null, 2))
+    console.log('🔍 Nominatim display_name:', data.display_name)
 
     // address コンポーネントから必要な要素を抽出
     if (data.address) {
@@ -377,9 +378,79 @@ export async function reverseGeocodeLocation(location: Location): Promise<string
       const address = parts.join('　') // 全角スペース区切りに統一
       if (address) {
         console.log(`✓ Final address (formatted): ${address}`)
-
         return address
       }
+    }
+
+    // フォールバック: display_name から整形
+    if (data.display_name) {
+      console.log('⚠️ Using display_name fallback (address details not available)')
+      const displayName = data.display_name
+      console.log(`🔍 display_name (raw): ${displayName}`)
+      
+      // カンマで分割
+      const parts = displayName.split(',').map(p => p.trim())
+      
+      // 以下のパターンを仮定:
+      // [0]=通り名など, [1]=丁目付き町名, [2]=町名, [3]=区, [4]=都道府県, ...
+      let prefecture = ''
+      let ward = ''
+      let townOnly = ''
+      let chome = ''
+      
+      // 都道府県を探す（「〇都」「〇県」で終わる）
+      for (let i = 0; i < parts.length; i++) {
+        if (/[都道府県]$/.test(parts[i])) {
+          prefecture = parts[i]
+          break
+        }
+      }
+      
+      // 区を探す（「〇区」で終わる）
+      for (let i = 0; i < parts.length; i++) {
+        if (/区$/.test(parts[i])) {
+          ward = parts[i]
+          break
+        }
+      }
+      
+      // 丁目を含む町名を探す
+      for (let i = 0; i < parts.length; i++) {
+        if (/[一二三四五六七八九十\d]丁目/.test(parts[i])) {
+          const chomeAndTown = parts[i]
+          const kanjiToNum: Record<string, string> = {
+            '一': '1', '二': '2', '三': '3', '四': '4', '五': '5',
+            '六': '6', '七': '7', '八': '8', '九': '9', '十': '10'
+          }
+          const chomePattern = /([一二三四五六七八九十]+)丁目/
+          const chomeMatch = chomeAndTown.match(chomePattern)
+          if (chomeMatch) {
+            const kanjiNum = chomeMatch[1]
+            const arabicNum = kanjiToNum[kanjiNum] || kanjiNum
+            chome = `${arabicNum}丁目`
+          }
+          break
+        }
+      }
+      
+      // 町名のみを探す（丁目の直後）
+      for (let i = 0; i < parts.length; i++) {
+        if (/[一二三四五六七八九十\d]丁目/.test(parts[i]) && i + 1 < parts.length) {
+          townOnly = parts[i + 1]
+          break
+        }
+      }
+      
+      // 組み立て
+      const formattedParts: string[] = []
+      if (prefecture) formattedParts.push(prefecture)
+      if (ward) formattedParts.push(ward)
+      if (townOnly) formattedParts.push(townOnly)
+      if (chome) formattedParts.push(chome)
+      
+      const formatted = formattedParts.join('　')
+      console.log(`✓ Final address (from display_name): ${formatted}`)
+      return formatted
     }
 
     console.warn('No address components found in Nominatim response')
