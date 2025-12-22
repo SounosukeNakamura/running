@@ -25,6 +25,12 @@ export interface WeatherData {
   clouds: {
     all: number
   }
+  rain?: {
+    '1h': number
+  }
+  snow?: {
+    '1h': number
+  }
 }
 
 // ===== 定数 =====
