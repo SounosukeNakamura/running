@@ -416,6 +416,69 @@ export default function App() {
           </div>
         )}
 
+        {/* 天気情報セクション（最上部） */}
+        {weatherLoading && (
+          <section className="card">
+            <div className="loading">天気情報を取得中...</div>
+          </section>
+        )}
+
+        {weatherError && (
+          <div className="alert alert-warning">
+            <span>⚠️ {weatherError}</span>
+          </div>
+        )}
+
+        {weather && (
+          <section className="card weather-card">
+            <h2>🌤️ 天気情報</h2>
+
+            <div className="weather-summary">
+              <p className="weather-main">{getWeatherDescription()}</p>
+              <div className="weather-advice">
+                {getWeatherAdvice().split('\n').map((advice, idx) => (
+                  <p key={idx}>{advice}</p>
+                ))}
+              </div>
+            </div>
+
+            <div className="weather-grid">
+              <div className="weather-item">
+                <span className="label">気温</span>
+                <span className="value">{Math.round(weather.main.temp)}°C</span>
+              </div>
+              <div className="weather-item">
+                <span className="label">体感温度</span>
+                <span className="value">{Math.round(weather.main.feels_like)}°C</span>
+              </div>
+              <div className="weather-item">
+                <span className="label">湿度</span>
+                <span className="value">{weather.main.humidity}%</span>
+              </div>
+              <div className="weather-item">
+                <span className="label">風速</span>
+                <span className="value">{(Math.round(weather.wind.speed * 10) / 10).toFixed(1)} m/s</span>
+              </div>
+              <div className="weather-item">
+                <span className="label">雲量</span>
+                <span className="value">{weather.clouds.all}%</span>
+              </div>
+              {weather.rain && weather.rain['1h'] > 0 && (
+                <div className="weather-item">
+                  <span className="label">降雨量（1h）</span>
+                  <span className="value">{weather.rain['1h']}mm</span>
+                </div>
+              )}
+              {weather.snow && weather.snow['1h'] > 0 && (
+                <div className="weather-item">
+                  <span className="label">降雪量（1h）</span>
+                  <span className="value">{weather.snow['1h']}cm</span>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
         {/* 位置情報セクション */}
         <section className="card">
           <h2>📍 位置情報</h2>
@@ -493,68 +556,6 @@ export default function App() {
           </section>
         )}
 
-        {/* 天気情報セクション */}
-        {weatherLoading && (
-          <section className="card">
-            <div className="loading">天気情報を取得中...</div>
-          </section>
-        )}
-
-        {weatherError && (
-          <div className="alert alert-warning">
-            <span>⚠️ {weatherError}</span>
-          </div>
-        )}
-
-        {weather && (
-          <section className="card weather-card">
-            <h2>🌤️ 天気情報</h2>
-
-            <div className="weather-summary">
-              <p className="weather-main">{getWeatherDescription()}</p>
-              <div className="weather-advice">
-                {getWeatherAdvice().split('\n').map((advice, idx) => (
-                  <p key={idx}>{advice}</p>
-                ))}
-              </div>
-            </div>
-
-            <div className="weather-grid">
-              <div className="weather-item">
-                <span className="label">気温</span>
-                <span className="value">{Math.round(weather.main.temp)}°C</span>
-              </div>
-              <div className="weather-item">
-                <span className="label">体感温度</span>
-                <span className="value">{Math.round(weather.main.feels_like)}°C</span>
-              </div>
-              <div className="weather-item">
-                <span className="label">湿度</span>
-                <span className="value">{weather.main.humidity}%</span>
-              </div>
-              <div className="weather-item">
-                <span className="label">風速</span>
-                <span className="value">{(Math.round(weather.wind.speed * 10) / 10).toFixed(1)} m/s</span>
-              </div>
-              <div className="weather-item">
-                <span className="label">雲量</span>
-                <span className="value">{weather.clouds.all}%</span>
-              </div>
-              {weather.rain && weather.rain['1h'] > 0 && (
-                <div className="weather-item">
-                  <span className="label">降雨量（1h）</span>
-                  <span className="value">{weather.rain['1h']}mm</span>
-                </div>
-              )}
-              {weather.snow && weather.snow['1h'] > 0 && (
-                <div className="weather-item">
-                  <span className="label">降雪量（1h）</span>
-                  <span className="value">{weather.snow['1h']}cm</span>
-                </div>
-              )}
-            </div>
-          </section>
-        )}
       </main>
 
       {/* フッター */}
