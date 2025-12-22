@@ -1,325 +1,227 @@
 # 🏃 ランニングコース提案アプリ
 
-天気情報と位置情報から、あなたにぴったりなランニングコースを自動生成するシングルページWebアプリケーションです。走りたい時間を入力するだけで、最適なコースが提案されます。
+## 概要
 
-## 🎯 v4.0 新機能：往復ルート最適化
+現在地から出発して、指定した時間以内に確実に出発地点へ戻ってこられるランニングコースを自動生成するアプリです。AIが走行距離や道路ネットワークを考慮して、最適な往復ルートを提案します。
 
-**2025年12月22日にv4.0がリリースされました。**
+**主な特徴：**
+- 📍 現在地を自動取得
+- ⏱️ 走りたい時間を入力するだけで距離を計算
+- 🗺️ 実際の道路ネットワークに基づいたルート生成
+- 🌤️ リアルタイム天気情報とランニングアドバイス
+- 📱 レスポンシブデザイン対応
 
-### 新機能：完全往復ルート提案
-- ✅ **スマートな往復コース**: スタート地点 = ゴール地点で往復するコースを自動生成
-- ✅ **完全時間制約管理**: `走りたい時間 - 2分 ≤ 推定時間 ≤ 走りたい時間` を厳密に守る
-- ✅ **同一ルート往復**: 往路と帰路が確実に同じ道を通る設計
-- ✅ **中間地点自動計算**: 推定時間の半分で到達する最適な折り返し地点を自動決定
-- ✅ **複数候補比較**: 5～20個のルート候補を生成し、最適なものを選択
-- ✅ **実在する道路対応**: Geolonia MapsとルーティングAPIで実在する道路に沿ったコース生成
+---
 
-**使用例：**
-```typescript
-// 東京駅から30分のランニングコース生成
-const route = await generateOptimizedRoundTripRoute(
-  { lat: 35.6762, lng: 139.7674 },
-  30
-);
-// → 往復距離: ~2.6km, 推定時間: 26.4分 で自動生成
-```
+## 機能一覧
 
-## 主な特徴
+### 1. **現在地取得**
+- ブラウザの Geolocation API を使用
+- 位置情報の許可が必要です
 
-✨ **AI駆動型コース生成**（v4.0）
-- 往復ルート自動最適化
-- 複数候補から最高スコアを選択
-- 時間制約を厳密に管理
-- 実在する道路に沿ったコース
+### 2. **ランニングコース自動生成**
+- 走りたい時間（分）を入力
+- 指定時間内に必ず戻ってこられる距離を計算
+- 実際の道路ネットワークに沿ったルート生成（OSRM 使用）
+- 折り返し地点を自動設定
 
-✨ **自動コース生成**
-- 走りたい時間から走行距離を計算
-- 出発地点を中心とした円周コースを自動生成
-- 詳細な座標データを表示
+### 3. **地図表示**
+- Geolonia を使用した高品質な地図
+- 生成されたルートをリアルタイムで表示
+- スタート＝ゴール地点とルートを視覚化
 
-🌤️ **天気情報連携**
-- OpenWeather API で現在の天気を取得
-- 気温、体感温度、湿度、風速、雲量を表示
-- 天気に応じた走行アドバイスを自動生成
+### 4. **天気情報表示**
+- OpenWeather API によるリアルタイム天気取得
+- 気温、体感温度、湿度、風速、降水量を表示
+- 天気に応じた詳細なランニングアドバイス
+  - 🔥 高温時：熱中症注意、水分補給の推奨
+  - ❄️ 低温時：防寒対策、ウォームアップ推奨
+  - 💧 高湿度時：ペース控えめの推奨
+  - 🌪️ 強風時：転倒リスク注意
+  - ☔ 降水時：路面注意、防水対策推奨
 
-📍 **位置情報管理**
-- Geolocation API で自動取得
-- 手動での緯度経度入力対応
-- Geolonia Maps で地図表示
+### 5. **住所表示**
+- 逆ジオコーディング（Nominatim）で位置情報を住所に変換
+- 日本の住所形式で見やすく表示
+  - 例：「東京都　葛飾区　白鳥　2丁目」
 
-⚡ **モダンUI**
-- レスポンシブデザイン対応
-- スムーズなアニメーション
-- スマートフォン最適化
+---
 
-## 技術スタック
+## 使用技術
 
-| 項目 | 技術 | 説明 |
+| 項目 | 技術 | 用途 |
 |------|------|------|
-| フロントエンド | React 18 + TypeScript | モダンUI構築 |
-| ビルドツール | Vite 5 | 高速ビルド・HMR |
-| スタイル | CSS Grid/Flexbox | レスポンシブ設計 |
-| 地図表示 | Geolonia Maps | リアルタイムルート表示 |
-| 天気API | OpenWeather | 気象データ取得 |
-| ルーティング | Google Maps API / OpenRouteService | 実在する道路に沿ったルート |
-| 地理計算 | Haversine公式 | 距離・座標計算 |
+| **フレームワーク** | React 18 + TypeScript 5 | UI フレームワーク |
+| **ビルドツール** | Vite 5 | 高速ビルド・開発サーバー |
+| **地図** | Geolonia | 地図表示・統合 |
+| **ルーティング** | OSRM（Open Source Routing Machine） | 実際の道路ネットワークに基づくルート計算 |
+| **天気** | OpenWeather API | リアルタイム天気情報 |
+| **住所検索** | Nominatim | 逆ジオコーディング |
+| **デプロイ** | Vercel | 本番環境ホスティング |
 
-### v4.0 エンジン実装詳細
+---
 
-| コンポーネント | ファイル | 説明 |
-|--------------|---------|------|
-| ルート生成エンジン v4.0 | `src/routeOptimizer.v4.ts` | 往復ルート最適化（新） |
-| メインUI | `src/RunningCourseApp.tsx` | React統合コンポーネント（新） |
-| 地図統合 | `src/geoloniaUtils.ts` | Geolonia統合ユーティリティ |
-| 検証機能 | `src/routeOptimizer.v4.ts` | ルート要件検証 |
+## セットアップ手順
 
-## セットアップ方法
+### 前提条件
+- Node.js 16 以上
+- npm または yarn
 
-### 1. 前提条件
-
-- Node.js v16 以上
-- npm v8 以上
-- [Geolonia](https://geolonia.com/) API キー
-- [OpenWeather](https://openweathermap.org/api) API キー
-
-### 2. APIキーの取得
-
-**Geolonia:**
-1. https://geolonia.com/ でアカウント作成
-2. ダッシュボードから API キーを取得
-
-**OpenWeather:**
-1. https://openweathermap.org/api でアカウント作成
-2. API キーを取得（無料版で十分）
-
-### 3. 環境変数の設定
+### インストール
 
 ```bash
-# .env.localファイルを作成
-cp .env.example .env.local
+# リポジトリをクローン
+git clone https://github.com/SounosukeNakamura/running.git
+cd running
+
+# 依存パッケージをインストール
+npm install
 ```
 
-`.env.local` に以下を記入：
+### 環境変数の設定
+
+プロジェクトルートに `.env.local` ファイルを作成し、以下の内容を追加してください：
 
 ```env
-VITE_GEOLONIA_API_KEY=your-geolonia-api-key
-VITE_OPENWEATHER_API_KEY=your-openweather-api-key
-VITE_RUNNING_PACE_MIN_PER_KM=6
+# OpenWeather API キー
+# https://openweathermap.org/api で取得
+VITE_OPENWEATHER_API_KEY=your_api_key_here
+
+# ランニングペース（分/km）
+VITE_RUNNING_PACE_MIN_PER_KM=5
 ```
 
-### 4. インストールと実行
+**注意：APIキーは絶対に public リポジトリに commit しないでください。`.gitignore` で `.env.local` を無視しています。**
+
+### 開発サーバーの起動
 
 ```bash
-# 依存パッケージのインストール
-npm install
-
-# 開発サーバー起動（http://localhost:5173）
 npm run dev
+```
 
-# プロダクションビルド
+ブラウザで `http://localhost:5173` を開き、アプリを実行します。
+
+### 本番ビルド
+
+```bash
 npm run build
+```
 
-# ビルド結果のプレビュー
+### ビルド結果の確認
+
+```bash
 npm run preview
 ```
 
-## 使用方法
+---
 
-### 基本的な流れ
+## 使い方
 
-1. **位置情報を取得**
-   - ブラウザの位置情報許可ダイアログで「許可」をクリック
-   - または手動で緯度・経度を入力
+1. **ブラウザを開く**
+   - デプロイされたアプリ：https://running-ashen-one.vercel.app
+   - または、ローカル開発サーバー
 
-2. **走行時間を入力**
-   - 「走りたい時間（分）」欄に数値を入力（1～300分）
+2. **位置情報を許可**
+   - ブラウザから位置情報の許可を求められます
+   - 「許可」をクリック
 
-3. **コースを生成**
-   - 「コースを生成」ボタンをクリック
-   - 走行距離が計算されコースが自動生成される
+3. **走りたい時間を入力**
+   - 「走りたい時間（分）」に数字を入力（例：30分）
+   - 1～300分の範囲内で指定可能
 
-4. **結果を確認**
-   - 提案コース（走行距離、ポイント数）
-   - 現在地の天気情報
-   - ランニングアドバイス
+4. **「コースを生成」をクリック**
+   - ルートが自動生成され、地図に表示されます
+   - 走行距離と推定時間を確認できます
 
-### スクリーンショット
+5. **天気情報を確認**
+   - リアルタイム天気とランニングアドバイスが表示されます
+   - アドバイスに従って、安全にランニングを楽しんでください
 
-各セクションの説明：
+---
 
-| セクション | 説明 |
-|-----------|------|
-| 📍 位置情報 | 現在地の表示と地図 |
-| ⏱️ ランニングコース生成 | 時間入力とコース生成 |
-| 🗺️ 提案コース | 走行距離とコース詳細 |
-| 🌤️ 天気情報 | 気象データと走行アドバイス |
+## 注意事項
 
-## プロジェクト構成
+⚠️ **重要な注意事項**
 
-```
-running/
-├── index.html                 # HTMLエントリーポイント
-├── package.json               # 依存パッケージ定義
-├── vite.config.ts             # Vite設定
-├── tsconfig.json              # TypeScript設定
-├── .env.example               # 環境変数テンプレート
-├── README.md                  # このファイル
-├── QUICKSTART.md              # クイックスタートガイド
-└── src/
-    ├── main.tsx               # React初期化
-    ├── App.tsx                # メインコンポーネント
-    ├── App.css                # スタイルシート
-    └── utils.ts               # ユーティリティ関数群
-```
+- **位置情報について**
+  - アプリは位置情報の利用許可が必要です
+  - 位置情報は計算用に使用され、保存や送信はされません
+  
+- **APIキー管理**
+  - OpenWeather API キーを公開しないでください
+  - Vercel にデプロイする場合、環境変数を設定してください
+  
+- **ルートの精度**
+  - 生成されたルートはあくまで参考値です
+  - 実際のランニング前に地図で確認してください
+  - 天候や道路状況によってコースを調整してください
 
-## コアな実装
+- **位置情報精度**
+  - GPS の精度は環境によって異なります
+  - 屋内や林の中では精度が低下する可能性があります
 
-### utils.ts - 地理計算とコース生成
-
-```typescript
-// Haversine公式で距離計算
-calculateDistance(loc1: Location, loc2: Location): number
-
-// 方位角と距離から新しい位置を計算
-getLocationByBearingAndDistance(
-  location: Location,
-  bearing: number,
-  distanceKm: number
-): Location
-
-// 円周コース生成
-generateCircularCourse(
-  center: Location,
-  totalDistanceKm: number,
-  points: number = 12
-): CoursePoint[]
-
-// 時間から走行距離を計算
-calculateRunningDistance(minutes: number): number
-
-// OpenWeather APIから天気取得
-fetchWeatherData(location: Location, apiKey: string): Promise<WeatherData>
-
-// バリデーション関数
-validateRunningMinutes(value: unknown): ValidationResult
-```
-
-### App.tsx - Reactコンポーネント
-
-主要な機能：
-- 位置情報管理（自動取得、手動入力）
-- コース自動生成ロジック
-- 天気情報取得と表示
-- エラーハンドリング
-- ローディング状態管理
-
-## 走行アドバイスロジック
-
-天気条件に基づいて自動的にアドバイスが生成されます：
-
-| 気温 | 風速 | アドバイス |
-|------|------|----------|
-| > 28°C | 任意 | 水分補給、日射対策 |
-| < 5°C | 任意 | ウォーミングアップ、防寒対策 |
-| 5-28°C | > 6 m/s | バランス注意 |
-| 5-28°C | ≤ 6 m/s | 最適な条件 |
-
-## 入力値バリデーション
-
-アプリケーションは以下の入力値検証を行います：
-
-```typescript
-// 走行時間：1～300分の整数
-validateRunningMinutes(value)
-// → { valid: boolean, error?: string }
-```
-
-## エラーハンドリング
-
-- **位置情報取得失敗** → デフォルト位置（東京）を設定
-- **API呼び出し失敗** → エラーメッセージを表示
-- **入力値エラー** → バリデーションエラーを表示
-
-## ブラウザ互換性
-
-- Chrome / Chromium ≥ 60
-- Firefox ≥ 55
-- Safari ≥ 11
-- Edge ≥ 15
-
-必須機能：
-- Geolocation API
-- Fetch API
-- ES2020 以降のJavaScript
-
-## 将来の拡張予定
-
-- [ ] GeoJSONを使ったコースの地図描画
-- [ ] 走行ログの保存（localStorage）
-- [ ] 複数コース提案機能
-- [ ] 高度やルート最適化
-- [ ] ソーシャル機能（コース共有）
-- [ ] PWA対応
+---
 
 ## トラブルシューティング
 
-### 地図が表示されない
-
-```
-原因：Geolonia APIキーが未設定
-解決：.env.localでVITE_GEOLONIA_API_KEYを確認
-```
-
-### 天気情報が取得できない
-
-```
-原因：OpenWeather APIキーが無効
-解決：https://openweathermap.org/api でキーを確認
-```
-
 ### 位置情報が取得できない
+- ブラウザの位置情報許可を確認してください
+- プライベートブラウジングモードでは位置情報が制限される場合があります
+
+### 天気情報が表示されない
+- ブラウザのコンソール（F12）でエラーメッセージを確認してください
+- OpenWeather API キーが正しく設定されているか確認してください
+- Vercel にデプロイしている場合、環境変数が設定されているか確認してください
+
+### ルートが生成されない
+- 走行時間を 1～300分の範囲で入力してください
+- ネットワーク接続を確認してください
+- OSRM API が利用可能か確認してください
+
+---
+
+## ファイル構成
 
 ```
-原因：ブラウザの位置情報許可設定
-解決：ブラウザの設定で位置情報アクセスを許可
-     または手動で緯度・経度を入力
+.
+├── index.html              # HTML テンプレート
+├── package.json            # 依存パッケージ定義
+├── tsconfig.json           # TypeScript 設定
+├── vite.config.ts          # Vite 設定
+├── .env.example            # 環境変数例（テンプレート）
+├── .env.local              # 環境変数（.gitignore で無視）
+├── README.md               # このファイル
+└── src/
+    ├── main.tsx            # エントリーポイント
+    ├── App.tsx             # メインアプリケーションコンポーネント
+    ├── App.css             # スタイルシート
+    ├── utils.ts            # ユーティリティ関数（API呼び出し、型定義）
+    └── routeOptimizer.v2.ts # ルート最適化エンジン
 ```
 
-## 📚 ドキュメント
+---
 
-v4.0 往復ルート最適化の詳細については、以下のドキュメントを参照してください：
+## 環境情報
 
-- **[実装完了サマリー](./IMPLEMENTATION_COMPLETE_SUMMARY.md)** - 全機能の実装状況と要件充足度
-- **[実装ガイド](./RUNNING_COURSE_IMPLEMENTATION.md)** - API仕様、アルゴリズム、テストケース
-- **[実装例とテストコード](./RUNNING_COURSE_EXAMPLES.ts)** - 7つの実装例とテストケース
-- **[クイックスタート](./QUICKSTART.md)** - セットアップと基本的な使い方
+| 項目 | バージョン |
+|------|-----------|
+| Node.js | 16+ |
+| React | 18.2+ |
+| TypeScript | 5+ |
+| Vite | 5+ |
 
-## パフォーマンス
-
-- バンドルサイズ: ~150KB (gzipped)
-- ビルド時間: ~5秒
-- 初期ロード: ~2秒
-- ルート生成API: ~5-40秒（ネットワーク遅延に依存）
+---
 
 ## ライセンス
 
-MIT
+MITライセンス
 
-## 参考資料
+---
 
-- [React Documentation](https://react.dev/)
-- [Vite Documentation](https://vitejs.dev/)
-- [OpenWeather API Docs](https://openweathermap.org/api)
-- [Geolonia Maps Docs](https://geolonia.com/docs/)
-- [Geolocation API - MDN](https://developer.mozilla.org/en-US/docs/Web/API/Geolocation_API)
-- [Haversine Formula](https://en.wikipedia.org/wiki/Haversine_formula)
-
-## サポート・フィードバック
+## サポート
 
 問題が発生した場合は、GitHub Issues で報告してください。
 
 ---
 
-**最終更新**: 2025年12月8日  
-**バージョン**: 2.0.0  
-**Author**: SounosukeNakamura
+**最終更新：2025年12月22日**
