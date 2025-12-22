@@ -86,8 +86,13 @@ export default function App() {
    * 現在地から住所を取得（location 変更時）
    */
   useEffect(() => {
-    if (!location) return
+    console.log('🔴🔴🔴 [useEffect for address] location changed:', location)
+    if (!location) {
+      console.log('🔴 location is null/undefined, returning early')
+      return
+    }
 
+    console.log('🔴 location exists, calling fetchAddress()')
     const fetchAddress = async () => {
       try {
         console.log('🔍 [DEBUG] Calling reverseGeocodeLocation with location:', location)
@@ -97,7 +102,7 @@ export default function App() {
         setLocationAddress(address)
         console.log('🔍 [DEBUG] State updated. locationAddress should now be:', address)
       } catch (error) {
-        console.error('Failed to get address for location:', error)
+        console.error('❌ Failed to get address for location:', error)
         const fallback = `${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}`
         console.log('🔍 [DEBUG] Using fallback address:', fallback)
         setLocationAddress(fallback)
