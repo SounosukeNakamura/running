@@ -524,13 +524,13 @@ export default function App() {
                 <span className="label">雲量</span>
                 <span className="value">{weather.clouds.all}%</span>
               </div>
-              {(weather.rain?.['1h'] || 0) > 0 && (
+              {weather.rain && weather.rain['1h'] > 0 && (
                 <div className="weather-item">
                   <span className="label">降雨量（1h）</span>
                   <span className="value">{weather.rain['1h']}mm</span>
                 </div>
               )}
-              {(weather.snow?.['1h'] || 0) > 0 && (
+              {weather.snow && weather.snow['1h'] > 0 && (
                 <div className="weather-item">
                   <span className="label">降雪量（1h）</span>
                   <span className="value">{weather.snow['1h']}cm</span>
