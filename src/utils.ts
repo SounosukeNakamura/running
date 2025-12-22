@@ -307,6 +307,8 @@ export function formatAddress(rawAddress: string): string {
  * @returns 住所文字列（都道府県 市区町村 町名 丁目の形式）
  */
 export async function reverseGeocodeLocation(location: Location): Promise<string> {
+  console.log('🔍🔍🔍 reverseGeocodeLocation called with:', location)
+  
   const url = new URL('https://nominatim.openstreetmap.org/reverse')
   url.searchParams.set('lat', location.lat.toString())
   url.searchParams.set('lon', location.lng.toString())
@@ -316,7 +318,10 @@ export async function reverseGeocodeLocation(location: Location): Promise<string
 
   try {
     console.log(`🔄 Reverse geocoding: ${location.lat}, ${location.lng}`)
+    console.log(`🔄 Nominatim URL: ${url.toString()}`)
     const response = await fetch(url.toString())
+    console.log(`🔍 Nominatim fetch response status: ${response.status}`)
+    
     if (!response.ok) {
       throw new Error(`Nominatim API error: ${response.status}`)
     }
@@ -463,7 +468,8 @@ export async function reverseGeocodeLocation(location: Location): Promise<string
     console.warn('No address components found in Nominatim response')
     return '住所を取得できませんでした'
   } catch (error) {
-    console.error('⚠️ Reverse geocoding error:', error)
+    console.error('🚨🚨🚨 Reverse geocoding error:', error)
+    console.error('Error details:', error instanceof Error ? error.message : String(error))
     return '住所を取得できませんでした'
   }
 }
