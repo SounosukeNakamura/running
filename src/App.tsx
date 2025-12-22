@@ -285,6 +285,10 @@ export default function App() {
   const fetchWeatherForLocation = async (loc: Location) => {
     const apiKey = import.meta.env.VITE_OPENWEATHER_API_KEY
 
+    console.log('🌤️ fetchWeatherForLocation called with location:', loc)
+    console.log('🔑 API Key exists:', !!apiKey)
+    console.log('🔑 API Key value (first 10 chars):', apiKey ? apiKey.substring(0, 10) : 'UNDEFINED')
+
     // APIキーが未設定の場合
     if (!apiKey || apiKey.trim() === '') {
       console.warn('⚠️ OpenWeather API キーが未設定です。.env に VITE_OPENWEATHER_API_KEY を設定してください。')
@@ -296,7 +300,9 @@ export default function App() {
     try {
       setWeatherLoading(true)
       setWeatherError('')
+      console.log('📡 Calling fetchWeatherData with location:', loc, 'API Key (first 10 chars):', apiKey.substring(0, 10))
       const data = await fetchWeatherData(loc, apiKey)
+      console.log('✅ Weather data received:', data)
       setWeather(data)
     } catch (err) {
       console.error('❌ 天気情報取得エラー:', err)
