@@ -32,13 +32,13 @@
         }
         
         // すべてのデータ属性を持つ要素を処理
-        const mapElements = document.querySelectorAll('[data-lat][data-lng]');
+        var mapElements = document.querySelectorAll('[data-lat][data-lng]');
         console.log('Found ' + mapElements.length + ' map elements to initialize');
         
         if (mapElements.length === 0) {
           console.warn('⚠️ No map elements found. Looking for elements with data-lat/data-lng attributes...');
           // DEBUG: すべての要素を列挙
-          const allElements = document.querySelectorAll('[data-lat], [data-lng]');
+          var allElements = document.querySelectorAll('[data-lat], [data-lng]');
           console.log('Elements with partial attributes:', allElements.length);
           allElements.forEach(function(el, i) {
             console.log('  [' + i + '] data-lat=' + el.getAttribute('data-lat') + ', data-lng=' + el.getAttribute('data-lng'));
@@ -46,15 +46,15 @@
         }
         
         mapElements.forEach(function(element, index) {
-          const lat = parseFloat(element.getAttribute('data-lat'));
-          const lng = parseFloat(element.getAttribute('data-lng'));
-          const zoom = parseInt(element.getAttribute('data-zoom') || '14');
+          var lat = parseFloat(element.getAttribute('data-lat'));
+          var lng = parseFloat(element.getAttribute('data-lng'));
+          var zoom = parseInt(element.getAttribute('data-zoom') || '14');
           
           console.log('Initializing map ' + (index + 1) + ': lat=' + lat + ', lng=' + lng + ', zoom=' + zoom);
           
           try {
             // Geolonia.Map クラスを使用して明示的に地図を作成
-            const map = new window.geolonia.Map({
+            var map = new window.geolonia.Map({
               container: element,
               center: [lng, lat],
               zoom: zoom,
@@ -81,7 +81,7 @@
       
       // コースを地図上に表示する関数
       // 第二引数にオプションを渡せます: { hideWaypointMarkers: true }
-      window.displayCourseOnMap = function(coursePoints, options) {
+      var displayCourseOnMapFunction = function(coursePoints, options) {
         console.log('displayCourseOnMap called. Map instance:', window.geoloniaMapInstance ? 'exists' : 'undefined');
         
         if (!window.geoloniaMapInstance) {
@@ -89,7 +89,7 @@
           setTimeout(function() {
             console.log('Retry: Map instance is now', window.geoloniaMapInstance ? 'available' : 'still undefined');
             if (window.geoloniaMapInstance) {
-              window.displayCourseOnMap(coursePoints, options);
+              displayCourseOnMapFunction(coursePoints, options);
             } else {
               console.error('❌ Failed to display course: map instance unavailable after retry');
             }
@@ -97,12 +97,12 @@
           return;
         }
         
-        const map = window.geoloniaMapInstance;
+        var map = window.geoloniaMapInstance;
         console.log('✓ Map instance found. Displaying ' + coursePoints.length + ' course points on map');
         
         try {
           // コースの座標をGeoJSON形式に変換
-          const coordinates = coursePoints.map(function(point) {
+          var coordinates = coursePoints.map(function(point) {
             return [point.lng, point.lat];
           });
           
@@ -219,6 +219,9 @@
           console.error('❌ Error displaying course on map:', err);
         }
       };
+      
+      // グローバル window に登録
+      window.displayCourseOnMap = displayCourseOnMapFunction;
               .setLngLat([point.lng, point.lat])
               .addTo(map);
             } catch (err) {
