@@ -116,7 +116,13 @@ export default function App() {
    * 地図表示の初期化（Geolonia）と初期天気取得
    */
   useEffect(() => {
-    if (!location) return
+    console.log('🔄 [useEffect] location dependency triggered. location:', location)
+    if (!location) {
+      console.log('🔴 [useEffect] location is null/undefined, returning early')
+      return
+    }
+
+    console.log('✅ [useEffect] location exists, proceeding with map and weather initialization')
 
     // React がレンダリング完了してから Geolonia 地図を初期化
     const timer = setTimeout(() => {
@@ -136,7 +142,7 @@ export default function App() {
     }, 100)
 
     // 初期位置情報取得時に自動的に天気を取得
-    console.log('🌤️ Auto-fetching weather for initial location:', location)
+    console.log('🌤️ [useEffect] About to call fetchWeatherForLocation with location:', location)
     fetchWeatherForLocation(location)
 
     return () => clearTimeout(timer)
