@@ -126,7 +126,7 @@ export default function App() {
 
     // React がレンダリング完了してから Geolonia 地図を初期化
     const timer = setTimeout(() => {
-      if (window.geolonia && (window as any).initializeGeoloniaMaps) {
+      if ((window as any).geolonia && (window as any).initializeGeoloniaMaps) {
         console.log('✓ Calling initializeGeoloniaMaps from React...')
         try {
           (window as any).initializeGeoloniaMaps()
@@ -201,8 +201,8 @@ export default function App() {
       console.log(`✓ Location set from address: ${newLocation.lat.toFixed(4)}, ${newLocation.lng.toFixed(4)}`)
       
       // Geolonia 地図を移動
-      if (window.geolonia) {
-        const maps = window.geolonia.maps
+      if ((window as any).geolonia) {
+        const maps = (window as any).geolonia.maps
         if (maps && maps.length > 0) {
           const map = maps[0]
           // Geolonia の地図を移動（flyTo でアニメーション付き移動）
