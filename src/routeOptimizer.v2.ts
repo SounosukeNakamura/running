@@ -48,10 +48,30 @@ export async function generateOptimizedClosedRoute(
     const maxTime = targetMinutes
 
     // 複数の bearing × scale で候補を生成
-    const candidates = await generateCandidates(startLocation, targetHalfDistance, minTime, maxTime)
+    let candidates = await generateCandidates(startLocation, targetHalfDistance, minTime, maxTime)
+
+    // フォールバック：制約を緩めて再試行（候補が0件の場合）
+    if (candidates.length === 0) {
+      console.log(
+        `\n⚠️ 制約を緩めて再試行中...\n   元の制約: ${minTime}分 ≤ 推定時間 ≤ ${maxTime}分\n   新制約: ${Math.max(1, targetMinutes - 5)}分 ≤ 推定時間 ≤ ${targetMinutes + 5}分`
+      )
+      const relaxedMinTime = Math.max(1, targetMinutes - 5)
+      const relaxedMaxTime = targetMinutes + 5
+      candidates = await generateCandidates(startLocation, targetHalfDistance, relaxedMinTime, relaxedMaxTime)
+    }
+
+    // さらにダメな場合は最小距離差の候補を試行
+    if (candidates.length === 0) {
+      console.log(
+        `\n⚠️ 最小距離差モードで再試行中...\n   制約: 3分 ≤ 推定時間 ≤ 120分（広い範囲）`
+      )
+      candidates = await generateCandidates(startLocation, targetHalfDistance, 3, 120)
+    }
 
     if (candidates.length === 0) {
-      throw new Error('有効なルート候補が見つかりません')
+      throw new Error(
+        'この周辺で道なり往復ルートが作成できませんでした。走行時間を増やすか、別の場所から実行してください。'
+      )
     }
 
     // 時間差が最小のルートを選択
@@ -106,7 +126,7 @@ async function generateCandidates(
 
       // 往復距離・推定時間を算出
       const totalDist = outwardDist * 2
-      const estimatedTime = (totalDist / RUNNING_PACE_MIN_PER_KM) * 60 // 秒を分に
+      const estimatedTime = totalDist * RUNNING_PACE_MIN_PER_KM // km * (分/km) = 分
 
       // 時間制約をチェック
       if (estimatedTime > maxTime) {
@@ -133,14 +153,17 @@ async function generateCandidates(
       })
 
       console.log(
-        `   試行: bearing=${bearing}°, scale=${scale.toFixed(2)}, 往路目標=${adjustedDist.toFixed(2)}km\n       OSRM片道: ${outwardDist.toFixed(2)}km\n       往復: ${totalDist.toFixed(2)}km / 推定${estimatedTime.toFixed(1)}分\n       ✓ 成功: 往復${totalDist.toFixed(2)}km / 推定${estimatedTime.toFixed(1)}分 (差: ${(estimatedTime - 30).toFixed(1)}分)`
+        `   試行: bearing=${bearing}°, scale=${scale.toFixed(2)}, 往路目標=${adjustedDist.toFixed(2)}km\n       OSRM片道: ${outwardDist.toFixed(2)}km / 往復: ${totalDist.toFixed(2)}km\n       ✓ 有効候補: 推定${estimatedTime.toFixed(1)}分 (制約内: ${minTime}分 ≤ ${estimatedTime.toFixed(1)}分 ≤ ${maxTime}分)`
       )
     }
   }
 
   console.log(
-    `\n📊 ${candidates.length}個の有効候補を生成しました\n   ${candidates.map((c, i) => `候補${i + 1}: bearing=${Math.round(Math.atan2(c.midLocation.lng - c.startLocation.lng, c.midLocation.lat - c.startLocation.lat) * 180 / Math.PI)}°, 往復${c.totalDistance.toFixed(2)}km / 推定${c.estimatedTime.toFixed(1)}分 (差: ${(c.estimatedTime - 30).toFixed(1)}分)`).join('\n   ')}`
+    `\n📊 ${candidates.length}個の有効候補を生成しました`
   )
+  candidates.forEach((c, i) => {
+    console.log(`   候補${i + 1}: 往復${c.totalDistance.toFixed(2)}km / 推定${c.estimatedTime.toFixed(1)}分`)
+  })
 
   return candidates
 }
