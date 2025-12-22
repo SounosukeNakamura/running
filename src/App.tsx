@@ -267,10 +267,12 @@ export default function App() {
       setOptimizedRoute(route)
       setCourseDistance(route.totalDistance)
 
-      // 地図にコースを表示（ルートパスを使用）
-      if ((window as any).displayCourseOnMap) {
-        console.log('📍 Displaying optimized closed route on map (hide waypoint markers)...')
-        ;(window as any).displayCourseOnMap(route.routePath || route.waypoints, { hideWaypointMarkers: true })
+      // 地図にコースを表示
+      if ((window as any).displayCourseOnMap && route.routePath && route.routePath.length > 0) {
+        console.log(`📍 Displaying route on map: ${route.routePath.length} points`)
+        ;(window as any).displayCourseOnMap(route.routePath)
+      } else {
+        console.warn('⚠️ Cannot display route: displayCourseOnMap or routePath unavailable')
       }
 
       // 天気情報を取得
@@ -544,14 +546,12 @@ export default function App() {
             <div className="course-info">
               <div className="info-item">
                 <span className="label">走行距離:</span>
-                <span className="value">{courseDistance.toFixed(2)} km</span>
+                <span className="value">{optimizedRoute.totalDistance.toFixed(2)} km</span>
               </div>
-              {optimizedRoute && (
-                <div className="info-item">
-                  <span className="label">推定走行時間:</span>
-                  <span className="value">{Math.round(optimizedRoute.estimatedTime)} 分</span>
-                </div>
-              )}
+              <div className="info-item">
+                <span className="label">推定走行時間:</span>
+                <span className="value">{optimizedRoute.estimatedTime.toFixed(1)} 分</span>
+              </div>
             </div>
           </section>
         )}
