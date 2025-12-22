@@ -193,7 +193,7 @@ function separateTownAndChome(fullName: string): string {
 
 /**
  * Nominatim APIの生の住所文字列を整形する
- * 例：「白鳥二丁目, 白鳥, 葛飾区, 東京都, 125-0063, 日本」
+ * 例：「フラワー通り, 白鳥二丁目, 白鳥, 葛飾区, 東京都, 125-0063, 日本」
  * → 「東京都　葛飾区　白鳥　2丁目」
  * 
  * @param rawAddress Nominatim APIから取得した生の住所文字列
@@ -218,28 +218,62 @@ export function formatAddress(rawAddress: string): string {
       return ''
     }
 
-    // 各要素を抽出
-    // 形式: [丁目/町名, 町名, 区, 都道府県, 郵便番号, 国]
-    let chomeAndTown = parts[0] || '' // 「白鳥二丁目」
-    let townOnly = parts[1] || '' // 「白鳥」
-    let ward = parts[2] || '' // 「葛飾区」
-    let prefecture = parts[3] || '' // 「東京都」
-    // parts[4] は郵便番号（使用しない）
-    // parts[5] は国（使用しない）
+    // Nominatim APIの応答形式を分析して対応
+    // 通常の形式: [街道/通り名, 丁目付き町名, 町名, 区, 都道府県, 郵便番号, 国]
+    // 例: フラワー通り, 白鳥二丁目, 白鳥, 葛飾区, 東京都, 125-0063, 日本
+    
+    // 丁目を含む町名を探す（「〇丁目」パターンを含む要素）
+    let chomeAndTownIndex = -1
+    let chomeAndTown = ''
+    let townOnly = ''
+    let ward = ''
+    let prefecture = ''
+    
+    for (let i = 0; i < parts.length; i++) {
+      if (/[一二三四五六七八九十\d]丁目/.test(parts[i])) {
+        chomeAndTownIndex = i
+        chomeAndTown = parts[i]
+        break
+      }
+    }
+
+    // 町名のみを抽出（丁目付きの次の要素が町名）
+    if (chomeAndTownIndex >= 0 && chomeAndTownIndex + 1 < parts.length) {
+      townOnly = parts[chomeAndTownIndex + 1]
+    }
+
+    // 区を探す（「〇区」で終わる要素）
+    for (let i = 0; i < parts.length; i++) {
+      if (/区$/.test(parts[i])) {
+        ward = parts[i]
+        break
+      }
+    }
+
+    // 都道府県を探す（「〇都」または「〇道」または「〇府」で終わる要素）
+    for (let i = 0; i < parts.length; i++) {
+      if (/[都道府県]$/.test(parts[i])) {
+        prefecture = parts[i]
+        break
+      }
+    }
 
     // 丁目部分を抽出（例：「白鳥二丁目」から「2丁目」を抽出）
     let chome = ''
-    const chomePattern = /([一二三四五六七八九十]+)丁目/
-    const chomeMatch = chomeAndTown.match(chomePattern)
-    
-    if (chomeMatch) {
-      const kanjiNum = chomeMatch[1]
+    if (chomeAndTown) {
       const kanjiToNum: Record<string, string> = {
         '一': '1', '二': '2', '三': '3', '四': '4', '五': '5',
         '六': '6', '七': '7', '八': '8', '九': '9', '十': '10'
       }
-      const arabicNum = kanjiToNum[kanjiNum] || kanjiNum
-      chome = `${arabicNum}丁目`
+      
+      const chomePattern = /([一二三四五六七八九十]+)丁目/
+      const chomeMatch = chomeAndTown.match(chomePattern)
+      
+      if (chomeMatch) {
+        const kanjiNum = chomeMatch[1]
+        const arabicNum = kanjiToNum[kanjiNum] || kanjiNum
+        chome = `${arabicNum}丁目`
+      }
     }
 
     // 組み立て：都道府県 → 区 → 町 → 丁目（全角スペース区切り）
