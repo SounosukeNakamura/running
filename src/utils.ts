@@ -302,6 +302,86 @@ export function formatAddress(rawAddress: string): string {
 }
 
 /**
+ * カンマ区切りの住所文字列を整形する
+ * 入力: 「白鳥二丁目, 白鳥, 葛飾区, 東京都, 日本」
+ * 出力: 「東京都　葛飾区　白鳥　2丁目」
+ */
+function formatAddressFromCommaSeparated(rawAddress: string): string {
+  if (!rawAddress || typeof rawAddress !== 'string') {
+    return ''
+  }
+
+  try {
+    const parts = rawAddress.split(',').map((p: string) => p.trim())
+    console.log('🔍 formatAddressFromCommaSeparated - Split parts:', parts)
+
+    let prefecture = ''
+    let ward = ''
+    let townOnly = ''
+    let chome = ''
+
+    // 都道府県を探す（「〇都」「〇県」で終わる）
+    for (const part of parts) {
+      if (/[都道府県]$/.test(part)) {
+        prefecture = part
+        break
+      }
+    }
+
+    // 区を探す（「〇区」で終わる）
+    for (const part of parts) {
+      if (/区$/.test(part)) {
+        ward = part
+        break
+      }
+    }
+
+    // 丁目を含む町名を探す
+    for (let i = 0; i < parts.length; i++) {
+      if (/[一二三四五六七八九十\d]丁目/.test(parts[i])) {
+        const chomeAndTown = parts[i]
+        
+        // 漢数字を数字に変換
+        const kanjiToNum: Record<string, string> = {
+          '一': '1', '二': '2', '三': '3', '四': '4', '五': '5',
+          '六': '6', '七': '7', '八': '8', '九': '9', '十': '10'
+        }
+        const chomePattern = /([一二三四五六七八九十]+)丁目/
+        const chomeMatch = chomeAndTown.match(chomePattern)
+        if (chomeMatch) {
+          const kanjiNum = chomeMatch[1]
+          const arabicNum = kanjiToNum[kanjiNum] || kanjiNum
+          chome = `${arabicNum}丁目`
+        }
+        break
+      }
+    }
+
+    // 町名のみを探す（丁目の直後）
+    for (let i = 0; i < parts.length; i++) {
+      if (/[一二三四五六七八九十\d]丁目/.test(parts[i]) && i + 1 < parts.length) {
+        townOnly = parts[i + 1]
+        break
+      }
+    }
+
+    // 組み立て
+    const result: string[] = []
+    if (prefecture) result.push(prefecture)
+    if (ward) result.push(ward)
+    if (townOnly) result.push(townOnly)
+    if (chome) result.push(chome)
+
+    const formatted = result.join('　')
+    console.log('🔍 formatAddressFromCommaSeparated - Final:', formatted)
+    return formatted
+  } catch (error) {
+    console.error('Error in formatAddressFromCommaSeparated:', error)
+    return ''
+  }
+}
+
+/**
  * OpenStreetMap Nominatim APIで緯度経度から住所を取得
  * @param location 緯度・経度
  * @returns 住所文字列（都道府県 市区町村 町名 丁目の形式）
@@ -393,74 +473,8 @@ export async function reverseGeocodeLocation(location: Location): Promise<string
       const displayName = data.display_name
       console.log(`🔍 display_name (raw): ${displayName}`)
       
-      // カンマで分割
-      const parts = displayName.split(',').map((p: string) => p.trim())
-      console.log(`🔍 Split parts:`, parts)
-      
-      // 以下のパターンを仮定:
-      // [0]=通り名など, [1]=丁目付き町名, [2]=町名, [3]=区, [4]=都道府県, ...
-      let prefecture = ''
-      let ward = ''
-      let townOnly = ''
-      let chome = ''
-      
-      // 都道府県を探す（「〇都」「〇県」で終わる）
-      for (let i = 0; i < parts.length; i++) {
-        if (/[都道府県]$/.test(parts[i])) {
-          prefecture = parts[i]
-          console.log(`🔍 Found prefecture at [${i}]: "${prefecture}"`)
-          break
-        }
-      }
-      
-      // 区を探す（「〇区」で終わる）
-      for (let i = 0; i < parts.length; i++) {
-        if (/区$/.test(parts[i])) {
-          ward = parts[i]
-          console.log(`🔍 Found ward at [${i}]: "${ward}"`)
-          break
-        }
-      }
-      
-      // 丁目を含む町名を探す
-      for (let i = 0; i < parts.length; i++) {
-        if (/[一二三四五六七八九十\d]丁目/.test(parts[i])) {
-          const chomeAndTown = parts[i]
-          console.log(`🔍 Found chomeAndTown at [${i}]: "${chomeAndTown}"`)
-          const kanjiToNum: Record<string, string> = {
-            '一': '1', '二': '2', '三': '3', '四': '4', '五': '5',
-            '六': '6', '七': '7', '八': '8', '九': '9', '十': '10'
-          }
-          const chomePattern = /([一二三四五六七八九十]+)丁目/
-          const chomeMatch = chomeAndTown.match(chomePattern)
-          if (chomeMatch) {
-            const kanjiNum = chomeMatch[1]
-            const arabicNum = kanjiToNum[kanjiNum] || kanjiNum
-            chome = `${arabicNum}丁目`
-            console.log(`🔍 Converted chome: "${chome}"`)
-          }
-          break
-        }
-      }
-      
-      // 町名のみを探す（丁目の直後）
-      for (let i = 0; i < parts.length; i++) {
-        if (/[一二三四五六七八九十\d]丁目/.test(parts[i]) && i + 1 < parts.length) {
-          townOnly = parts[i + 1]
-          console.log(`🔍 Found townOnly at [${i + 1}]: "${townOnly}"`)
-          break
-        }
-      }
-      
-      // 組み立て
-      const formattedParts: string[] = []
-      if (prefecture) formattedParts.push(prefecture)
-      if (ward) formattedParts.push(ward)
-      if (townOnly) formattedParts.push(townOnly)
-      if (chome) formattedParts.push(chome)
-      
-      console.log(`🔍 formattedParts:`, formattedParts)
-      const formatted = formattedParts.join('　')
+      // シンプルな整形関数を使用
+      const formatted = formatAddressFromCommaSeparated(displayName)
       console.log(`✓ Final address (from display_name): ${formatted}`)
       return formatted
     }
