@@ -192,6 +192,72 @@ function separateTownAndChome(fullName: string): string {
 }
 
 /**
+ * Nominatim APIの生の住所文字列を整形する
+ * 例：「白鳥二丁目, 白鳥, 葛飾区, 東京都, 125-0063, 日本」
+ * → 「東京都　葛飾区　白鳥　2丁目」
+ * 
+ * @param rawAddress Nominatim APIから取得した生の住所文字列
+ * @returns 整形された住所（都・区・町・丁目の形式、全角スペース区切り）
+ */
+export function formatAddress(rawAddress: string): string {
+  // 入力チェック
+  if (!rawAddress || typeof rawAddress !== 'string') {
+    return ''
+  }
+
+  const trimmed = rawAddress.trim()
+  if (trimmed === '') {
+    return ''
+  }
+
+  try {
+    // カンマで分割
+    const parts = trimmed.split(',').map(p => p.trim())
+    
+    if (parts.length === 0) {
+      return ''
+    }
+
+    // 各要素を抽出
+    // 形式: [丁目/町名, 町名, 区, 都道府県, 郵便番号, 国]
+    let chomeAndTown = parts[0] || '' // 「白鳥二丁目」
+    let townOnly = parts[1] || '' // 「白鳥」
+    let ward = parts[2] || '' // 「葛飾区」
+    let prefecture = parts[3] || '' // 「東京都」
+    // parts[4] は郵便番号（使用しない）
+    // parts[5] は国（使用しない）
+
+    // 丁目部分を抽出（例：「白鳥二丁目」から「2丁目」を抽出）
+    let chome = ''
+    const chomePattern = /([一二三四五六七八九十]+)丁目/
+    const chomeMatch = chomeAndTown.match(chomePattern)
+    
+    if (chomeMatch) {
+      const kanjiNum = chomeMatch[1]
+      const kanjiToNum: Record<string, string> = {
+        '一': '1', '二': '2', '三': '3', '四': '4', '五': '5',
+        '六': '6', '七': '7', '八': '8', '九': '9', '十': '10'
+      }
+      const arabicNum = kanjiToNum[kanjiNum] || kanjiNum
+      chome = `${arabicNum}丁目`
+    }
+
+    // 組み立て：都道府県 → 区 → 町 → 丁目（全角スペース区切り）
+    const result: string[] = []
+    
+    if (prefecture) result.push(prefecture)
+    if (ward) result.push(ward)
+    if (townOnly) result.push(townOnly)
+    if (chome) result.push(chome)
+
+    return result.join('　') // 全角スペース
+  } catch (error) {
+    console.error('Error formatting address:', error)
+    return ''
+  }
+}
+
+/**
  * OpenStreetMap Nominatim APIで緯度経度から住所を取得
  * @param location 緯度・経度
  * @returns 住所文字列（都道府県 市区町村 町名 丁目の形式）

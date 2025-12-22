@@ -36,6 +36,7 @@ import {
   validateRunningMinutes,
   geocodeAddress,
   reverseGeocodeLocation,
+  formatAddress,
 } from './utils'
 import { generateOptimizedClosedRoute, OptimizedRoute } from './routeOptimizer.v2'
 
@@ -90,8 +91,9 @@ export default function App() {
 
     const fetchAddress = async () => {
       try {
-        const address = await reverseGeocodeLocation(location)
-        setLocationAddress(address)
+        const rawAddress = await reverseGeocodeLocation(location)
+        const formattedAddress = formatAddress(rawAddress)
+        setLocationAddress(formattedAddress)
       } catch (error) {
         console.error('Failed to get address for location:', error)
         setLocationAddress(`${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}`)
