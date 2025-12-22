@@ -36,7 +36,6 @@ import {
   validateRunningMinutes,
   geocodeAddress,
   reverseGeocodeLocation,
-  formatAddress,
 } from './utils'
 import { generateOptimizedClosedRoute, OptimizedRoute } from './routeOptimizer.v2'
 
