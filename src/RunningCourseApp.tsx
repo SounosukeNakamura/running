@@ -399,49 +399,14 @@ export function RunningCourseApp() {
                   <div style={styles.statLabel}>往復距離</div>
                   <div style={styles.statValue}>{state.route.totalDistance.toFixed(2)}km</div>
                 </div>
-
-                <div style={styles.statCard}>
-                  <div style={styles.statLabel}>ウェイポイント</div>
-                  <div style={styles.statValue}>{state.route.waypoints.length}個</div>
-                </div>
-
-                <div style={styles.statCard}>
-                  <div style={styles.statLabel}>平均ペース</div>
-                  <div style={styles.statValue}>
-                    {(state.route.estimatedTime / (state.route.totalDistance / 2)).toFixed(1)}分/km
-                  </div>
-                </div>
               </div>
 
               {/* 検証結果 */}
-              {state.validation && (
+              {state.validation && state.validation.isValid && (
                 <div style={styles.validationSection}>
-                  <h3>ルート検証結果</h3>
-                  {state.validation.isValid ? (
-                    <div style={{ ...styles.alert, ...styles.alertSuccess }}>
-                      <p>✅ このルートは要件をすべて満たしています</p>
-                    </div>
-                  ) : (
-                    <div style={{ ...styles.alert, ...styles.alertError }}>
-                      <p>❌ ルート検証に失敗しました</p>
-                      <ul style={styles.errorList}>
-                        {state.validation.errors.map((err: string, i: number) => (
-                          <li key={i}>{err}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {state.validation.warnings.length > 0 && (
-                    <div style={{ ...styles.alert, ...styles.alertWarning }}>
-                      <p>⚠️ 警告</p>
-                      <ul style={styles.errorList}>
-                        {state.validation.warnings.map((warn: string, i: number) => (
-                          <li key={i}>{warn}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
+                  <div style={{ ...styles.alertSuccess, padding: '12px', borderRadius: '6px', backgroundColor: '#E8F5E9', border: '1px solid #4CAF50' }}>
+                    <p style={{ margin: 0, color: '#2E7D32', fontSize: '14px' }}>✅ このルートは要件をすべて満たしています</p>
+                  </div>
                 </div>
               )}
             </section>
@@ -461,18 +426,9 @@ export function RunningCourseApp() {
                 </div>
 
                 <div style={styles.detailItem}>
-                  <h4>ウェイポイント</h4>
-                  <p>
-                    経由地点数: {state.route.waypoints.length}個
-                    <br />
-                    ルート座標数: {state.route.routePath.length}個
-                  </p>
-                </div>
-
-                <div style={styles.detailItem}>
                   <h4>走行条件</h4>
                   <p>
-                    標準ペース: 6分/km
+                    標準ペース: 5分/km
                     <br />
                     路面: 混在（推定）
                   </p>

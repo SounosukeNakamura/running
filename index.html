@@ -141,33 +141,84 @@
             }
           });
           
-          // マーカーを追加（オプションでウェイポイントを非表示にできる）
-          var hideWaypoints = options && options.hideWaypointMarkers === true;
-          coursePoints.forEach(function(point, idx) {
-            // スタート（インデックス0）は常に表示
-            if (hideWaypoints && idx !== 0) return;
-
-            var markerColor = idx === 0 ? '#10b981' : '#ef4444'; // 起点は緑、他は赤
-            var markerSize = idx === 0 ? 35 : 25;
-
-            var markerElement = document.createElement('div');
-            markerElement.style.width = markerSize + 'px';
-            markerElement.style.height = markerSize + 'px';
-            markerElement.style.backgroundColor = markerColor;
-            markerElement.style.borderRadius = '50%';
-            markerElement.style.border = '2px solid white';
-            markerElement.style.display = 'flex';
-            markerElement.style.alignItems = 'center';
-            markerElement.style.justifyContent = 'center';
-            markerElement.style.color = 'white';
-            markerElement.style.fontSize = '12px';
-            markerElement.style.fontWeight = 'bold';
-            markerElement.textContent = idx;
-
-            try {
-              new window.geolonia.Marker({
-                element: markerElement
-              })
+          console.log('✓ Route polyline added to map');
+          
+          // スタート地点（起点）マーカーを追加
+          var startMarkerElement = document.createElement('div');
+          startMarkerElement.style.width = '35px';
+          startMarkerElement.style.height = '35px';
+          startMarkerElement.style.backgroundColor = '#10b981';
+          startMarkerElement.style.borderRadius = '50%';
+          startMarkerElement.style.border = '3px solid white';
+          startMarkerElement.style.display = 'flex';
+          startMarkerElement.style.alignItems = 'center';
+          startMarkerElement.style.justifyContent = 'center';
+          startMarkerElement.style.color = 'white';
+          startMarkerElement.style.fontSize = '12px';
+          startMarkerElement.style.fontWeight = 'bold';
+          startMarkerElement.style.boxShadow = '0 2px 4px rgba(0,0,0,0.3)';
+          startMarkerElement.textContent = 'S';
+          
+          new window.geolonia.Marker({
+            element: startMarkerElement
+          })
+          .setLngLat([coursePoints[0].lng, coursePoints[0].lat])
+          .addTo(map);
+          
+          console.log('✓ Start marker added at', coursePoints[0].lat, coursePoints[0].lng);
+          
+          // 折り返し地点（往路の終点）マーカーを追加
+          // coursePoints.length が奇数の場合は中央、偶数の場合はそれに近い点
+          var turnbackIndex = Math.floor(coursePoints.length / 2);
+          var turnbackPoint = coursePoints[turnbackIndex];
+          
+          var turnbackMarkerElement = document.createElement('div');
+          turnbackMarkerElement.style.width = '30px';
+          turnbackMarkerElement.style.height = '30px';
+          turnbackMarkerElement.style.backgroundColor = '#f59e0b';
+          turnbackMarkerElement.style.borderRadius = '50%';
+          turnbackMarkerElement.style.border = '2px solid white';
+          turnbackMarkerElement.style.display = 'flex';
+          turnbackMarkerElement.style.alignItems = 'center';
+          turnbackMarkerElement.style.justifyContent = 'center';
+          turnbackMarkerElement.style.color = 'white';
+          turnbackMarkerElement.style.fontSize = '11px';
+          turnbackMarkerElement.style.fontWeight = 'bold';
+          turnbackMarkerElement.style.boxShadow = '0 2px 4px rgba(0,0,0,0.3)';
+          turnbackMarkerElement.textContent = 'T';
+          
+          new window.geolonia.Marker({
+            element: turnbackMarkerElement
+          })
+          .setLngLat([turnbackPoint.lng, turnbackPoint.lat])
+          .addTo(map);
+          
+          console.log('✓ Turnback point marker added at', turnbackPoint.lat, turnbackPoint.lng);
+          
+          // 地図の視野をルート全体に合わせる（fitBounds）
+          var minLat = coursePoints[0].lat;
+          var maxLat = coursePoints[0].lat;
+          var minLng = coursePoints[0].lng;
+          var maxLng = coursePoints[0].lng;
+          
+          coursePoints.forEach(function(point) {
+            minLat = Math.min(minLat, point.lat);
+            maxLat = Math.max(maxLat, point.lat);
+            minLng = Math.min(minLng, point.lng);
+            maxLng = Math.max(maxLng, point.lng);
+          });
+          
+          map.fitBounds(
+            [[minLng, minLat], [maxLng, maxLat]],
+            { padding: 50, maxZoom: 15 }
+          );
+          
+          console.log('✓ Map bounds adjusted to fit all points');
+          console.log('✅ Course display completed successfully');
+        } catch (err) {
+          console.error('❌ Error displaying course on map:', err);
+        }
+      };
               .setLngLat([point.lng, point.lat])
               .addTo(map);
             } catch (err) {

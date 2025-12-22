@@ -165,6 +165,33 @@ export async function fetchWeatherData(
 }
 
 /**
+ * 住所の町名と丁目を分離する
+ * 例：「白鳥二丁目」→ 「白鳥 2丁目」
+ */
+function separateTownAndChome(fullName: string): string {
+  if (!fullName) return fullName
+  
+  // 「〇丁目」パターンを数字に変換（一→1、二→2 等）
+  const kanjiToNum: Record<string, string> = {
+    '一': '1', '二': '2', '三': '3', '四': '4', '五': '5',
+    '六': '6', '七': '7', '八': '8', '九': '9', '十': '10'
+  }
+  
+  // 漢数字の丁目パターンを検出
+  const chomePattern = /([一二三四五六七八九十]+)丁目/
+  const match = fullName.match(chomePattern)
+  
+  if (match) {
+    const kanjiNum = match[1]
+    const arabicNum = kanjiToNum[kanjiNum] || kanjiNum
+    const townName = fullName.replace(chomePattern, '').trim()
+    return `${townName} ${arabicNum}丁目`
+  }
+  
+  return fullName
+}
+
+/**
  * OpenStreetMap Nominatim APIで緯度経度から住所を取得
  * @param location 緯度・経度
  * @returns 住所文字列（都道府県 市区町村 町名 丁目の形式）
@@ -186,35 +213,17 @@ export async function reverseGeocodeLocation(location: Location): Promise<string
 
     const data = await response.json()
     console.log('Nominatim response address:', JSON.stringify(data.address, null, 2))
-    console.log('Nominatim response display_name:', data.display_name)
 
     // address コンポーネントから必要な要素を抽出
     if (data.address) {
       const addr = data.address
       const parts: string[] = []
       
-      console.log('=== Address Component Analysis ===')
-      
-      // 1. 都道府県（state または display_name から抽出）
+      // 1. 都道府県（state）
       let prefecture = ''
       if (addr.state) {
         prefecture = addr.state
         console.log(`  ✓ State (都道府県): ${addr.state}`)
-      } else if (data.display_name) {
-        // display_name から都道府県を抽出（日本の場合、カンマで分割）
-        // 例：「千住旭町, 足立区, 東京都, 123-1234, 日本」
-        const displayParts = data.display_name.split(',').map((p: string) => p.trim())
-        // 日本の住所は「町名, 市区町村, 都道府県, 郵便番号, 国」の順序
-        // 逆順から探す（国から数えて4番目が都道府県）
-        for (let i = displayParts.length - 1; i >= 0; i--) {
-          const part = displayParts[i]
-          // 「都」「道」「府」「県」を含む要素を都道府県として抽出
-          if ((part.includes('都') || part.includes('道') || part.includes('府') || part.includes('県')) && !part.includes('日本')) {
-            prefecture = part
-            console.log(`  ✓ Prefecture (都道府県) from display_name: ${part}`)
-            break
-          }
-        }
       }
       if (prefecture) parts.push(prefecture)
       
@@ -235,49 +244,30 @@ export async function reverseGeocodeLocation(location: Location): Promise<string
       }
       if (municipality) parts.push(municipality)
       
-      // 3. 町名（suburb, neighbourhood など）
+      // 3. 町名と丁目の組み合わせ処理
+      // (suburb または neighbourhood から町名を取得)
       let townName = ''
       if (addr.suburb) {
         townName = addr.suburb
-        console.log(`  ✓ Suburb (町名): ${addr.suburb}`)
+        console.log(`  ✓ Suburb (町名/丁目): ${addr.suburb}`)
       } else if (addr.neighbourhood) {
         townName = addr.neighbourhood
-        console.log(`  ✓ Neighbourhood (町名): ${addr.neighbourhood}`)
+        console.log(`  ✓ Neighbourhood (町名/丁目): ${addr.neighbourhood}`)
       } else if (addr.village) {
         townName = addr.village
-        console.log(`  ✓ Village (町名): ${addr.village}`)
+        console.log(`  ✓ Village (町名/丁目): ${addr.village}`)
       }
-      if (townName) parts.push(townName)
       
-      // 4. 丁目（chome, quarter, house_number など）
-      let chome = ''
-      if (addr.chome) {
-        chome = addr.chome
-        console.log(`  ✓ Chome (丁目): ${addr.chome}`)
-      } else if (addr.quarter) {
-        chome = addr.quarter
-        console.log(`  ✓ Quarter (丁目): ${addr.quarter}`)
-      } else if (addr.house_number) {
-        // house_number から丁目を抽出（例：「1」→ 「1丁目」）
-        const houseNum = addr.house_number
-        if (!houseNum.includes('丁目') && !isNaN(Number(houseNum))) {
-          chome = houseNum + '丁目'
-          console.log(`  ✓ House Number (丁目): ${chome}`)
-        }
-      } else if (data.display_name) {
-        // display_name から「〇丁目」パターンを抽出
-        const chomeMatch = data.display_name.match(/(\d+丁目)/);
-        if (chomeMatch) {
-          chome = chomeMatch[1]
-          console.log(`  ✓ Chome from display_name (丁目): ${chome}`)
-        }
+      // 町名と丁目を分離（例：「白鳥二丁目」→ 「白鳥 2丁目」）
+      if (townName) {
+        townName = separateTownAndChome(townName)
+        parts.push(townName)
       }
-      if (chome) parts.push(chome)
 
       const address = parts.join(' ')
       if (address) {
         console.log(`✓ Final address: ${address}`)
-        console.log('================================')
+
         return address
       }
     }
