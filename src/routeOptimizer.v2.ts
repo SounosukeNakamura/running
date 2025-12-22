@@ -84,11 +84,16 @@ async function generateCandidates(
   maxTime: number
 ): Promise<OptimizedRoute[]> {
   const candidates: OptimizedRoute[] = []
+  const MAX_CANDIDATES = 3 // 最大3個で早期終了
   const bearings = [0, 45, 90, 135, 180, 225, 270, 315]
   const scales = [0.8, 0.85, 0.9, 0.95, 1.0, 1.05, 1.1, 1.15, 1.2]
 
   for (const bearing of bearings) {
+    if (candidates.length >= MAX_CANDIDATES) break // 3個見つかったら終了
+
     for (const scale of scales) {
+      if (candidates.length >= MAX_CANDIDATES) break // 3個見つかったら終了
+
       const adjustedDist = targetHalfDist * scale
       const midLoc = getLocationByBearingAndDistance(startLoc, bearing, adjustedDist)
 
