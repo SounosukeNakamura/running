@@ -113,7 +113,7 @@ export default function App() {
   }, [location])
 
   /**
-   * 地図表示の初期化（Geolonia）
+   * 地図表示の初期化（Geolonia）と初期天気取得
    */
   useEffect(() => {
     if (!location) return
@@ -134,6 +134,10 @@ export default function App() {
         setGeoloniaReady(true)
       }
     }, 100)
+
+    // 初期位置情報取得時に自動的に天気を取得
+    console.log('🌤️ Auto-fetching weather for initial location:', location)
+    fetchWeatherForLocation(location)
 
     return () => clearTimeout(timer)
   }, [location])
