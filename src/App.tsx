@@ -314,33 +314,72 @@ export default function App() {
     const temp = Math.round(weather.main.temp)
     const feelsLike = Math.round(weather.main.feels_like)
     const windSpeed = Math.round(weather.wind.speed * 10) / 10
+    const humidity = weather.main.humidity
     const description = weather.weather[0]?.description || ''
 
-    return `${description} (気温: ${temp}°C, 体感: ${feelsLike}°C, 風速: ${windSpeed}m/s)`
+    return `${description} (気温: ${temp}°C, 体感: ${feelsLike}°C, 湿度: ${humidity}%, 風速: ${windSpeed}m/s)`
   }
 
   /**
-   * 天気に基づくアドバイスを生成
+   * 天気に基づく詳細なランニングアドバイスを生成
    */
   const getWeatherAdvice = () => {
     if (!weather) return ''
 
     const temp = weather.main.temp
+    const feelsLike = weather.main.feels_like
+    const humidity = weather.main.humidity
     const windSpeed = weather.wind.speed
+    const rainVolume = weather.rain?.['1h'] || 0
+    const snowVolume = weather.snow?.['1h'] || 0
+    const isPrecipitation = rainVolume > 0 || snowVolume > 0
 
-    if (temp > 28) {
-      return '気温が高いです。水分補給をこまめに行い、帽子を被るなど日射対策をしましょう。'
+    const advices: string[] = []
+
+    // 気温に基づくアドバイス
+    if (temp >= 28 || feelsLike >= 30) {
+      advices.push('🔥 熱中症注意！こまめな水分・塩分補給が必須')
+      advices.push('帽子・サングラス着用、日中の時間帯は避ける')
+      advices.push('ペースを控えめに、無理は禁物です')
+    } else if (temp <= 5) {
+      advices.push('❄️ 防寒対策が必要です。手袋・ネック巻き推奨')
+      advices.push('ウォームアップを長めに、筋肉を十分ほぐす')
+      advices.push('アイシング（冷たい風）対策で首周りを保護')
+    } else {
+      advices.push('✅ 気温は快適な範囲です')
     }
 
-    if (temp < 5) {
-      return '気温が低いです。ウォーミングアップをしっかり行い、防寒対策をしてください。'
+    // 湿度に基づくアドバイス
+    if (humidity >= 80) {
+      advices.push('💧 高湿度！心拍が上がりやすいため、無理をしない')
+      advices.push('いつもより遅いペースで、頻繁に休憩を取ってください')
+    } else if (humidity >= 70) {
+      advices.push('湿度が高め。いつもより水分補給を意識的に')
     }
 
-    if (windSpeed > 6) {
-      return '風が強いです。バランスに注意して走ってください。'
+    // 風速に基づくアドバイス
+    if (windSpeed >= 8) {
+      advices.push('🌪️ 強風注意！向かい風で負荷が増します')
+      advices.push('コース設計：折返し後に追い風を活用、体力配分を工夫')
+      advices.push('バランスに注意、転倒リスク↑')
+    } else if (windSpeed >= 6) {
+      advices.push('風が強め。バランスに注意してください')
     }
 
-    return 'ランニングに適した条件です。安全に楽しんでください。'
+    // 降水に基づくアドバイス
+    if (isPrecipitation) {
+      advices.push(`☔ 雨・雪あり（${rainVolume > 0 ? `雨量${rainVolume}mm` : ''}${snowVolume > 0 ? `${rainVolume > 0 ? '、' : ''}積雪${snowVolume}cm` : ''}）`)
+      advices.push('路面が滑りやすい。速度落とし気味で、慎重に')
+      advices.push('防水ウェア・帽子・防水シューズで対策')
+      advices.push('コース選定：舗装が良好で滑りにくい区間を優先')
+    }
+
+    // アドバイスがない場合のデフォルト
+    if (advices.length === 0) {
+      advices.push('✅ ランニングに適した条件です。安全に楽しんでください！')
+    }
+
+    return advices.join('\n')
   }
 
   // ===== レンダリング =====
@@ -457,7 +496,11 @@ export default function App() {
 
             <div className="weather-summary">
               <p className="weather-main">{getWeatherDescription()}</p>
-              <p className="weather-advice">{getWeatherAdvice()}</p>
+              <div className="weather-advice">
+                {getWeatherAdvice().split('\n').map((advice, idx) => (
+                  <p key={idx}>{advice}</p>
+                ))}
+              </div>
             </div>
 
             <div className="weather-grid">
@@ -481,6 +524,18 @@ export default function App() {
                 <span className="label">雲量</span>
                 <span className="value">{weather.clouds.all}%</span>
               </div>
+              {(weather.rain?.['1h'] || 0) > 0 && (
+                <div className="weather-item">
+                  <span className="label">降雨量（1h）</span>
+                  <span className="value">{weather.rain['1h']}mm</span>
+                </div>
+              )}
+              {(weather.snow?.['1h'] || 0) > 0 && (
+                <div className="weather-item">
+                  <span className="label">降雪量（1h）</span>
+                  <span className="value">{weather.snow['1h']}cm</span>
+                </div>
+              )}
             </div>
           </section>
         )}
