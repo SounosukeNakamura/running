@@ -90,12 +90,17 @@ export default function App() {
 
     const fetchAddress = async () => {
       try {
+        console.log('🔍 [DEBUG] Calling reverseGeocodeLocation with location:', location)
         const address = await reverseGeocodeLocation(location)
-        console.log('🔍 [DEBUG] address from reverseGeocodeLocation:', address)
+        console.log('🔍 [DEBUG] Returned from reverseGeocodeLocation:', address)
+        console.log('🔍 [DEBUG] Setting locationAddress to:', address)
         setLocationAddress(address)
+        console.log('🔍 [DEBUG] State updated. locationAddress should now be:', address)
       } catch (error) {
         console.error('Failed to get address for location:', error)
-        setLocationAddress(`${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}`)
+        const fallback = `${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}`
+        console.log('🔍 [DEBUG] Using fallback address:', fallback)
+        setLocationAddress(fallback)
       }
     }
 

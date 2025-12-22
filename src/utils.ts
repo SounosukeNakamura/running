@@ -390,6 +390,7 @@ export async function reverseGeocodeLocation(location: Location): Promise<string
       
       // カンマで分割
       const parts = displayName.split(',').map((p: string) => p.trim())
+      console.log(`🔍 Split parts:`, parts)
       
       // 以下のパターンを仮定:
       // [0]=通り名など, [1]=丁目付き町名, [2]=町名, [3]=区, [4]=都道府県, ...
@@ -402,6 +403,7 @@ export async function reverseGeocodeLocation(location: Location): Promise<string
       for (let i = 0; i < parts.length; i++) {
         if (/[都道府県]$/.test(parts[i])) {
           prefecture = parts[i]
+          console.log(`🔍 Found prefecture at [${i}]: "${prefecture}"`)
           break
         }
       }
@@ -410,6 +412,7 @@ export async function reverseGeocodeLocation(location: Location): Promise<string
       for (let i = 0; i < parts.length; i++) {
         if (/区$/.test(parts[i])) {
           ward = parts[i]
+          console.log(`🔍 Found ward at [${i}]: "${ward}"`)
           break
         }
       }
@@ -418,6 +421,7 @@ export async function reverseGeocodeLocation(location: Location): Promise<string
       for (let i = 0; i < parts.length; i++) {
         if (/[一二三四五六七八九十\d]丁目/.test(parts[i])) {
           const chomeAndTown = parts[i]
+          console.log(`🔍 Found chomeAndTown at [${i}]: "${chomeAndTown}"`)
           const kanjiToNum: Record<string, string> = {
             '一': '1', '二': '2', '三': '3', '四': '4', '五': '5',
             '六': '6', '七': '7', '八': '8', '九': '9', '十': '10'
@@ -428,6 +432,7 @@ export async function reverseGeocodeLocation(location: Location): Promise<string
             const kanjiNum = chomeMatch[1]
             const arabicNum = kanjiToNum[kanjiNum] || kanjiNum
             chome = `${arabicNum}丁目`
+            console.log(`🔍 Converted chome: "${chome}"`)
           }
           break
         }
@@ -437,6 +442,7 @@ export async function reverseGeocodeLocation(location: Location): Promise<string
       for (let i = 0; i < parts.length; i++) {
         if (/[一二三四五六七八九十\d]丁目/.test(parts[i]) && i + 1 < parts.length) {
           townOnly = parts[i + 1]
+          console.log(`🔍 Found townOnly at [${i + 1}]: "${townOnly}"`)
           break
         }
       }
@@ -448,6 +454,7 @@ export async function reverseGeocodeLocation(location: Location): Promise<string
       if (townOnly) formattedParts.push(townOnly)
       if (chome) formattedParts.push(chome)
       
+      console.log(`🔍 formattedParts:`, formattedParts)
       const formatted = formattedParts.join('　')
       console.log(`✓ Final address (from display_name): ${formatted}`)
       return formatted
