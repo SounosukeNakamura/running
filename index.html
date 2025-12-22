@@ -80,8 +80,8 @@
       };
       
       // コースを地図上に表示する関数
-      // 第二引数にオプションを渡せます: { hideWaypointMarkers: true }
       var displayCourseOnMapFunction = function(coursePoints, options) {
+        console.log('📍 Calling displayCourseOnMap');
         console.log('displayCourseOnMap called. Map instance:', window.geoloniaMapInstance ? 'exists' : 'undefined');
         
         if (!window.geoloniaMapInstance) {
@@ -168,7 +168,6 @@
           console.log('✓ Start marker added at', coursePoints[0].lat, coursePoints[0].lng);
           
           // 折り返し地点（往路の終点）マーカーを追加
-          // coursePoints.length が奇数の場合は中央、偶数の場合はそれに近い点
           var turnbackIndex = Math.floor(coursePoints.length / 2);
           var turnbackPoint = coursePoints[turnbackIndex];
           
@@ -222,18 +221,6 @@
       
       // グローバル window に登録
       window.displayCourseOnMap = displayCourseOnMapFunction;
-              .setLngLat([point.lng, point.lat])
-              .addTo(map);
-            } catch (err) {
-              console.error('Error creating marker ' + idx + ':', err);
-            }
-          });
-          
-          console.log('✓ Course displayed on map with ' + coursePoints.length + ' markers');
-        } catch (err) {
-          console.error('Error displaying course on map:', err);
-        }
-      };
       
       // Geolonia 読み込み完了後に初期化
       window.addEventListener('load', function() {
