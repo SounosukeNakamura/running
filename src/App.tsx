@@ -91,13 +91,9 @@ export default function App() {
 
     const fetchAddress = async () => {
       try {
-        const rawAddress = await reverseGeocodeLocation(location)
-        console.log('🔍 [DEBUG] rawAddress from reverseGeocodeLocation:', rawAddress)
-        
-        const formattedAddress = formatAddress(rawAddress)
-        console.log('🔍 [DEBUG] formattedAddress from formatAddress:', formattedAddress)
-        
-        setLocationAddress(formattedAddress)
+        const address = await reverseGeocodeLocation(location)
+        console.log('🔍 [DEBUG] address from reverseGeocodeLocation:', address)
+        setLocationAddress(address)
       } catch (error) {
         console.error('Failed to get address for location:', error)
         setLocationAddress(`${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}`)

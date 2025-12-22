@@ -374,9 +374,9 @@ export async function reverseGeocodeLocation(location: Location): Promise<string
         parts.push(townName)
       }
 
-      const address = parts.join(' ')
+      const address = parts.join('　') // 全角スペース区切りに統一
       if (address) {
-        console.log(`✓ Final address: ${address}`)
+        console.log(`✓ Final address (formatted): ${address}`)
 
         return address
       }
