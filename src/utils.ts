@@ -202,17 +202,20 @@ function separateTownAndChome(fullName: string): string {
 export function formatAddress(rawAddress: string): string {
   // 入力チェック
   if (!rawAddress || typeof rawAddress !== 'string') {
+    console.log('🔍 [DEBUG formatAddress] Invalid input:', rawAddress)
     return ''
   }
 
   const trimmed = rawAddress.trim()
   if (trimmed === '') {
+    console.log('🔍 [DEBUG formatAddress] Empty input')
     return ''
   }
 
   try {
     // カンマで分割
     const parts = trimmed.split(',').map(p => p.trim())
+    console.log('🔍 [DEBUG formatAddress] Split parts:', parts)
     
     if (parts.length === 0) {
       return ''
@@ -233,6 +236,7 @@ export function formatAddress(rawAddress: string): string {
       if (/[一二三四五六七八九十\d]丁目/.test(parts[i])) {
         chomeAndTownIndex = i
         chomeAndTown = parts[i]
+        console.log(`🔍 [DEBUG formatAddress] Found chomeAndTown at index ${i}: "${chomeAndTown}"`)
         break
       }
     }
@@ -240,12 +244,14 @@ export function formatAddress(rawAddress: string): string {
     // 町名のみを抽出（丁目付きの次の要素が町名）
     if (chomeAndTownIndex >= 0 && chomeAndTownIndex + 1 < parts.length) {
       townOnly = parts[chomeAndTownIndex + 1]
+      console.log(`🔍 [DEBUG formatAddress] townOnly: "${townOnly}"`)
     }
 
     // 区を探す（「〇区」で終わる要素）
     for (let i = 0; i < parts.length; i++) {
       if (/区$/.test(parts[i])) {
         ward = parts[i]
+        console.log(`🔍 [DEBUG formatAddress] Found ward: "${ward}"`)
         break
       }
     }
@@ -254,6 +260,7 @@ export function formatAddress(rawAddress: string): string {
     for (let i = 0; i < parts.length; i++) {
       if (/[都道府県]$/.test(parts[i])) {
         prefecture = parts[i]
+        console.log(`🔍 [DEBUG formatAddress] Found prefecture: "${prefecture}"`)
         break
       }
     }
@@ -273,6 +280,7 @@ export function formatAddress(rawAddress: string): string {
         const kanjiNum = chomeMatch[1]
         const arabicNum = kanjiToNum[kanjiNum] || kanjiNum
         chome = `${arabicNum}丁目`
+        console.log(`🔍 [DEBUG formatAddress] Converted chome: "${chome}"`)
       }
     }
 
@@ -284,7 +292,9 @@ export function formatAddress(rawAddress: string): string {
     if (townOnly) result.push(townOnly)
     if (chome) result.push(chome)
 
-    return result.join('　') // 全角スペース
+    const formatted = result.join('　') // 全角スペース
+    console.log('🔍 [DEBUG formatAddress] Final result:', formatted)
+    return formatted
   } catch (error) {
     console.error('Error formatting address:', error)
     return ''
