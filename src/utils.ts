@@ -389,7 +389,7 @@ export async function reverseGeocodeLocation(location: Location): Promise<string
       console.log(`🔍 display_name (raw): ${displayName}`)
       
       // カンマで分割
-      const parts = displayName.split(',').map(p => p.trim())
+      const parts = displayName.split(',').map((p: string) => p.trim())
       
       // 以下のパターンを仮定:
       // [0]=通り名など, [1]=丁目付き町名, [2]=町名, [3]=区, [4]=都道府県, ...
